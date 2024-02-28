@@ -1,4 +1,4 @@
-python data/get_ss_seq.py \
-    --pdb_dir data/A501/raw \
+python src/data/get_ss_seq.py \
+    --pdb_dir data/deeploc/pdb_tmp \
     --num_workers 6 \
-    --out_file result/ss_seq/A501_ss_seq.json
+    --out_file data/deeploc_ss_tmp.json

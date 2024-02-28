@@ -105,8 +105,6 @@ def loop(model, accelerator, dataloader, epoch=0, optimizer=None, device=None):
 def create_parser():
     parser = argparse.ArgumentParser()
 
-    # train strategy
-
     # train model
     parser.add_argument("--load_ckpt", type=str, default=None)
     parser.add_argument('--ckpt_dir', default=None, help='directory to save trained models')
