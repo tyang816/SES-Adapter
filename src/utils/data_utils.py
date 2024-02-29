@@ -98,7 +98,7 @@ class BatchSampler(data.Sampler):
                       including batches of a single element
     :param shuffle: if `True`, batches in shuffled order
     '''
-    def __init__(self, node_counts, max_batch_nodes=3000, shuffle=True):
+    def __init__(self, node_counts, max_batch_nodes=10000, shuffle=True):
         
         self.node_counts = node_counts
         self.idx = [i for i in range(len(node_counts)) if node_counts[i] <= max_batch_nodes]

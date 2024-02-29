@@ -3,43 +3,42 @@ import warnings
 import torch
 import os
 import sys
-import yaml
 import wandb
 import random
+import json
 from torch import nn
 from tqdm import tqdm
-from torch_scatter import scatter_mean
-from torch_geometric.loader import DataLoader as pygDataLoader
-from torch_geometric.data import Batch
+from torch.utils.data import DataLoader
 from transformers import logging
-from torchmetrics.classification import BinaryAccuracy
+from torchmetrics.classification import MulticlassAccuracy
 from accelerate import Accelerator
 from time import strftime, localtime
+from transformers import EsmTokenizer
 from src.utils.data_utils import BatchSampler
-from src.utils.utils import print_param_num
-from model import GNN_model
+from src.models.locseek import LocSeekModel
 
 # set path
 current_dir=os.getcwd()
 sys.path.append(current_dir)
-#ignore warning information
+# ignore warning information
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 
-def train(args, model, accelerator, train_loader, val_loader, test_loader, optimizer, device):
+def train(args, model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer):
     best_acc = 0
     path = os.path.join(args.ckpt_dir, args.model_name)
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
         model.train()
-        train_loss, train_acc = loop(model, accelerator, train_loader, epoch, optimizer, device)
+        train_loss, train_acc = loop(model, accelerator, metrics, train_loader, epoch, optimizer, use_wandb=args.wandb)
         print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
         
         model.eval()
         with torch.no_grad():
-            val_loss, val_acc = loop(model, accelerator, val_loader, epoch, device=device)
-            wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
+            val_loss, val_acc = loop(model, accelerator, metrics, val_loader, epoch, use_wandb=args.wandb)
+            if args.wandb:
+                wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
         print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
         
         if val_acc > best_acc:
@@ -52,37 +51,26 @@ def train(args, model, accelerator, train_loader, val_loader, test_loader, optim
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        loss, acc = loop(model, accelerator, test_loader, device=device)
-        wandb.log({"test/test_loss": loss, "test/test_acc": acc})
+        loss, acc = loop(model, accelerator, metrics, test_loader, use_wandb=args.wandb)
+        if args.wandb:
+            wandb.log({"test/test_loss": loss, "test/test_acc": acc})
     print(f'TEST loss: {loss:.4f} acc: {acc:.4f}')
 
     
-def loop(model, accelerator, dataloader, epoch=0, optimizer=None, device=None):
+def loop(model, accelerator, metrics, dataloader, epoch=0, optimizer=None, use_wandb=False):
     total_loss, total_acc = 0, 0
     iter_num = len(dataloader)
     global_steps = epoch * len(dataloader)
     epoch_iterator = tqdm(dataloader)
-    # loss_fn = nn.BCEWithLogitsLoss()
     loss_fn = nn.CrossEntropyLoss()
-    # labels = []
-    # x_means = []
-    # x_input = []
     for batch in epoch_iterator:
-        batch.to(device)
-        label = torch.as_tensor(batch.label, dtype=torch.float32).to(device)
-        label = label.argmax(-1)
-        logits, x_mean = model(batch)
-        input_x = scatter_mean(batch.x, batch.batch, dim=0)
-        # x_input.append(input_x)
-        # labels.append(label)
-        # x_means.append(x_mean)
-        # print(input_x.shape, label.shape, x_mean.shape)
-        # print(logits.squeeze(-1).cpu(), label.cpu())
+        label = batch["label"]
+        logits = model(batch)
+        print(logits.shape, label.shape)
         loss = loss_fn(logits.squeeze(-1), label)
         total_loss += loss.item()
-        preds = logits.argmax(-1)
         
-        acc = int(torch.sum(preds == label).cpu()) / len(label)
+        acc = metrics(logits.squeeze(-1), label)
         total_acc += acc
         
         global_steps += 1
@@ -92,7 +80,8 @@ def loop(model, accelerator, dataloader, epoch=0, optimizer=None, device=None):
             optimizer.step()
             optimizer.zero_grad()
             epoch_iterator.set_postfix(train_loss=loss.item(), train_acc=acc)
-            wandb.log({"train/train_loss": loss.item(), "train/train_acc": acc, "train/epoch": epoch}, step=global_steps)
+            if use_wandb:
+                wandb.log({"train/train_loss": loss.item(), "train/train_acc": acc, "train/epoch": epoch}, step=global_steps)
         else:
             epoch_iterator.set_postfix(eval_loss=loss.item(), eval_acc=acc)
     
@@ -101,56 +90,74 @@ def loop(model, accelerator, dataloader, epoch=0, optimizer=None, device=None):
     return epoch_loss, epoch_acc
 
 
-
-def create_parser():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    # model params
+    parser.add_argument('--hidden_size', type=int, default=512, help='embedding hidden size of the model')
+    parser.add_argument('--intermediate_size', type=int, default=1280, help='intermediate size of the model')
+    parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
+    parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
+    parser.add_argument('--esm_model_name', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
+    parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
+    
+    # dataset
+    parser.add_argument('--train_file', type=str, default=None, help='train file')
+    parser.add_argument('--val_file', type=str, default=None, help='val file')
+    parser.add_argument('--test_file', type=str, default=None, help='test file')
+    
     # train model
-    parser.add_argument("--load_ckpt", type=str, default=None)
-    parser.add_argument('--ckpt_dir', default=None, help='directory to save trained models')
-    parser.add_argument('--model_name', default=None, help='model name')
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument("--problem_type",type=str,default="multi_label_classification")
-    parser.add_argument("--num_labels",type=int,default=10, help="number of localizations")
-    parser.add_argument('--max_nodes', type=int, default=3000, help='max number of nodes per batch')
+    parser.add_argument('--max_batch_token', type=int, default=3000, help='max number of token per batch')
     parser.add_argument('--max_train_epochs', type=int, default=10, help='training epochs')
-    parser.add_argument("--node_dim",type=int,default=26, help="number of node feature")
-    parser.add_argument("--edge_dim",type=int,default=93, help="number of edge feature")
-    parser.add_argument("--layer_num",type=int,default=6, help="number of layer")
-    parser.add_argument("--dropout",type=float,default=0, help="dropout rate")
-    parser.add_argument("--clip",type=float,default=4.0, help="mix ratio of af and cath dataset")
+    
+    # save model
+    parser.add_argument('--model_name', type=str, default=None, help='model name')
+    parser.add_argument('--ckpt_root', default="ckpt", help='root directory to save trained models')
+    parser.add_argument('--ckpt_dir', default=None, help='directory to save trained models')
     
     # wandb log
-    parser.add_argument('--wandb_project', type=str, default='LGN_loc_debug')
+    parser.add_argument('--wandb', action='store_true', help='use wandb to log')
+    parser.add_argument('--wandb_project', type=str, default='LocSeek')
     parser.add_argument("--wandb_entity", type=str, default="matwings")
     parser.add_argument('--wandb_run_name', type=str, default=None)
     args = parser.parse_args()
-    return args
-
-
-if __name__ == "__main__":
-    args = create_parser()
     
-    if args.wandb_run_name is None:
-        args.wandb_run_name = f"LGN_lr{args.lr}"
-    if args.model_name is None:
-        args.model_name = f"{args.wandb_run_name}.pt"
+    if args.wandb:
+        if args.wandb_run_name is None:
+            args.wandb_run_name = f"LocSeek"
+        if args.model_name is None:
+            args.model_name = f"{args.wandb_run_name}.pt"
+        
+        wandb.init(
+            project=args.wandb_project, name=args.wandb_run_name, 
+            entity=args.wandb_entity, config=vars(args)
+        )
+        
     if args.ckpt_dir is None:
         current_date = strftime("%Y%m%d", localtime())
         args.ckpt_dir = os.path.join(args.ckpt_root, current_date)
     os.makedirs(args.ckpt_dir, exist_ok=True)
     
-    wandb.init(
-        project=args.wandb_project, name=args.wandb_run_name, 
-        entity=args.wandb_entity, config=vars(args)
-    )
-    
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    gnn_config=yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
+    model = LocSeekModel(args)
+    model.to(device)
 
-    train_dataset = torch.load("data/location/Locationk10/processed/train.pt")
-    val_dataset = torch.load("data/location/Locationk10/processed/val.pt")
-    test_dataset = torch.load("data/location/Locationk10/processed/test.pt")
+    def get_trainable_params(model):
+        return [p for p in model.parameters() if p.requires_grad]
+    print(f">>> Trainable parameters: {sum(p.numel() for p in get_trainable_params(model))/1e6:.2f}M")
+    
+    def load_dataset(file):
+        dataset, token_num = [], []
+        for l in open(file):
+            data = json.loads(l)
+            dataset.append(data)
+            token_num.append(len(data["aa_seq"]))
+        return dataset, token_num
+
+    train_dataset, train_token_num = load_dataset(args.train_file)
+    val_dataset, val_token_num = load_dataset(args.val_file)
+    test_dataset, test_token_num = load_dataset(args.test_file)
     
     print(">>> trainset: ", len(train_dataset))
     print(">>> valset: ", len(val_dataset))
@@ -160,38 +167,60 @@ if __name__ == "__main__":
     for i in random.sample(range(len(train_dataset)), 3):
         print(">>> ", train_dataset[i])
     
+    aa_tokenizer = EsmTokenizer.from_pretrained(args.esm_model_name)
+    foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/foldseek.txt")
+    ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/ss8.txt")
     
-    loc_dataloader = lambda dataset: pygDataLoader(
-        dataset=dataset, 
-        num_workers=4, 
-        batch_sampler=BatchSampler(
-            dataset,
-            [d.num_nodes for d in dataset],
-            batch_token_num=args.max_nodes
-            )
-        )
-    train_loader, val_loader, test_loader = map(
-        loc_dataloader, (train_dataset, val_dataset, test_dataset)
-    )
-
-    model = GNN_model(gnn_config, args)
-    model.to(device)
-    print_param_num(model)
-    # model_state_dict = torch.load(args.load_ckpt)["model_state_dict"]
-    # new_state_dict = {}
-    # for key, value in model_state_dict.items():
-    #     new_key = "GNN_model." + key
-    #     new_state_dict[new_key] = value
-    # model.load_state_dict(new_state_dict)
-
+    def collate_fn(examples):
+        aa_seq, foldseek_seq, ss8_seq, label = [], [], [], []
+        for e in examples:
+            aa_seq.append(e["aa_seq"])
+            foldseek_seq.append(e["foldseek_seq"])
+            ss8_seq.append(e["ss8_seq"])
+            label.append(e["label"])
+        
+        aa_inputs = aa_tokenizer(aa_seq, return_tensors="pt", padding=True, truncation=True)
+        aa_input_ids = aa_inputs["input_ids"].to(device)
+        attention_mask = aa_inputs["attention_mask"].to(device)
+        
+        foldseek_input_ids = foldseek_tokenizer(foldseek_seq, return_tensors="pt", padding=True, truncation=True)["input_ids"].to(device)
+        ss8_input_ids = ss8_tokenizer(ss8_seq, return_tensors="pt", padding=True, truncation=True)["input_ids"].to(device)
+        
+        return {
+            "aa_input_ids": aa_input_ids, 
+            "attention_mask": attention_mask, 
+            "foldseek_input_ids": foldseek_input_ids, 
+            "ss8_input_ids": ss8_input_ids,
+            "label": torch.as_tensor(label, dtype=torch.float32).to(device)
+            }
+        
+    
     accelerator = Accelerator()
-    
+    metrics = MulticlassAccuracy(num_classes=args.num_labels)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_sampler=BatchSampler(train_token_num, max_batch_nodes=args.max_batch_token), 
+        collate_fn=collate_fn
+        )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_sampler=BatchSampler(val_token_num, max_batch_nodes=args.max_batch_token, shuffle=False), 
+        collate_fn=collate_fn
+        )
+    test_loader = DataLoader(
+        test_dataset, 
+        batch_sampler=BatchSampler(test_token_num, max_batch_nodes=args.max_batch_token, shuffle=False), 
+        collate_fn=collate_fn
+        )
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
         model, optimizer, train_loader, val_loader, test_loader
     )
     
     print("---------- Start Training ----------")
-    train(args, model, accelerator, train_loader, val_loader, test_loader, optimizer, device=device)
-    wandb.finish()
+    train(args, model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer)
+    
+    if args.wandb:
+        wandb.finish()

@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
+from transformers import EsmModel
 from src.models.pooling import Attention1dPoolingHead
-from transformers import AutoTokenizer, EsmModel
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)
@@ -16,7 +16,7 @@ def apply_rotary_pos_emb(x, cos, sin):
 
     return (x * cos) + (rotate_half(x) * sin)
 
-class RotaryEmbedding(torch.nn.Module):
+class RotaryEmbedding(nn.Module):
     """
     Rotary position embeddings based on those in
     [RoFormer](https://huggingface.co/docs/transformers/model_doc/roformer). Query and keys are transformed by rotation
@@ -62,47 +62,62 @@ class RotaryEmbedding(torch.nn.Module):
 class CrossModalAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.hidden_size = config.hidden_size  # 确保有hidden_size属性
-        self.query_proj = nn.Linear(self.hidden_size, self.hidden_size)
-        self.key_proj = nn.Linear(self.hidden_size, self.hidden_size)
-        self.value_proj = nn.Linear(self.hidden_size, self.hidden_size)
-        self.out_proj = nn.Linear(self.hidden_size, self.hidden_size)
-        self.rotary_embeddings = RotaryEmbedding(dim=self.hidden_size // 2)  # 注意调整维度以适配RotaryEmbedding
-
-    def forward(self, query, key, value, attention_mask=None):
-        # 获取旋转位置编码
-        cos, sin = self.rotary_embeddings._update_cos_sin_tables(query)
-
-        # 应用旋转位置编码到query和key
-        query_rot = apply_rotary_pos_emb(query, cos, sin)
-        key_rot = apply_rotary_pos_emb(key, cos, sin)
-
-        # 对经过旋转编码的query和key进行线性变换
-        query = self.query_proj(query_rot)
-        key = self.key_proj(key_rot)
-        value = self.value_proj(value)
+        self.attention_head_size = config.hidden_size // config.num_attention_heads
+        assert (
+            self.attention_head_size * config.num_attention_heads == config.hidden_size
+        ), "Embed size needs to be divisible by num heads"
+        self.num_attention_heads = config.num_attention_heads
+        self.hidden_size = config.hidden_size
         
-        # 计算注意力分数
-        attn_scores = torch.matmul(query, key.transpose(-2, -1))
-        attn_scores = attn_scores / (query.size(-1) ** 0.5)
+        self.query_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        self.key_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        self.value_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+        
+        self.out_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        self.rotary_embeddings = RotaryEmbedding(dim=self.attention_head_size)
+
+    def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
+        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        x = x.view(new_x_shape)
+        return x.permute(0, 2, 1, 3)
+    
+    def forward(self, query, key, value, attention_mask=None, output_attentions=False):
+        key_layer = self.transpose_for_scores(self.key_proj(key))
+        value_layer = self.transpose_for_scores(self.value_proj(value))
+        query_layer = self.transpose_for_scores(self.query_proj(query))
+        query_layer = query_layer * self.attention_head_size**-0.5
+        
+        query_layer, key_layer = self.rotary_embeddings(query_layer, key_layer)
+        
+        # Take the dot product between "query" and "key" to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         
         if attention_mask is not None:
             attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-            attention_mask = (1.0 - attention_mask) * -10000.0
-            attn_scores = attn_scores + attention_mask
+            attention_scores = attention_scores.masked_fill(attention_mask == 0, float('-inf'))
         
-        attn_probs = F.softmax(attn_scores, dim=-1)
-        context = torch.matmul(attn_probs, value)
-        attended = self.out_proj(context)
-        return attended
+        attention_probs = F.softmax(attention_scores, dim=-1)
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.dropout(attention_probs)
+        context_layer = torch.matmul(attention_probs, value_layer)
+
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size,)
+        context_layer = context_layer.view(new_context_layer_shape)
+        
+        outputs = (context_layer, attention_probs) if output_attentions else context_layer
+        
+        return outputs
 
 class LocSeekModel(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(config.esm_model_name)
-        self.model = EsmModel.from_pretrained(config.esm_model_name)
-        self.pooling_method = Attention1dPoolingHead(config)
+        self.model = EsmModel.from_pretrained(config.esm_model_name).eval()
+        self.pooling_method = Attention1dPoolingHead(config.hidden_size, config.num_labels)
         self.foldseek_embedding = nn.Embedding(20, config.hidden_size)
         self.ss_embedding = nn.Embedding(8, config.hidden_size)
         
@@ -110,13 +125,10 @@ class LocSeekModel(nn.Module):
         self.cross_attention_foldseek = CrossModalAttention(config)
 
     def forward(self, batch):
-        aa_seq, ss_seq, foldseek_seq = batch
+        aa_seq, ss_seq, foldseek_seq, attention_mask = batch['aa_input_ids'], batch['ss8_input_ids'], batch['foldseek_input_ids'], batch['attention_mask']
         
         with torch.no_grad():
-            inputs = self.tokenizer(aa_seq, return_tensors="pt", padding=True, truncation=True)
-            input_ids = inputs["input_ids"].cuda()
-            attention_mask = inputs["attention_mask"].cuda()
-            outputs = self.model(input_ids, attention_mask=attention_mask)
+            outputs = self.model(aa_seq, attention_mask=attention_mask)
             seq_embeds = outputs.last_hidden_state
 
         ss_embeds = self.ss_embedding(ss_seq)
@@ -129,8 +141,8 @@ class LocSeekModel(nn.Module):
         foldseek_context = self.cross_attention_foldseek(ss_context, foldseek_embeds, foldseek_embeds, attention_mask)
         
         # 将氨基酸序列、二级结构上下文、FoldSeek上下文聚合
-        combined_embeds = torch.cat([seq_embeds, ss_context, foldseek_context], dim=1)
-        final_embeds = self.pooling_method(combined_embeds, attention_mask)
-        
+        print(foldseek_context.shape)
+        final_embeds = self.pooling_method(foldseek_context, attention_mask)
+        print(final_embeds.shape)
         return final_embeds
        

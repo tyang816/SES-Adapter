@@ -52,9 +52,9 @@ class MaskedConv1d(nn.Conv1d):
 
 
 class Attention1dPooling(nn.Module):
-    def __init__(self, config):
+    def __init__(self, hidden_size):
         super().__init__()
-        self.layer = MaskedConv1d(config.hidden_size, 1, 1)
+        self.layer = MaskedConv1d(hidden_size, 1, 1)
 
     def forward(self, x, input_mask=None):
         batch_szie = x.shape[0]
@@ -69,11 +69,11 @@ class Attention1dPooling(nn.Module):
         return out
 
 class Attention1dPoolingProjection(nn.Module):
-    def __init__(self, config) -> None:
+    def __init__(self, hidden_size, num_labels) -> None:
         super(Attention1dPoolingProjection, self).__init__()
-        self.linear = nn.Linear(config.hidden_size, config.hidden_size)
+        self.linear = nn.Linear(hidden_size, hidden_size)
         self.relu = nn.ReLU()
-        self.final = nn.Linear(config.hidden_size, config.num_labels)
+        self.final = nn.Linear(hidden_size, num_labels)
 
     def forward(self, x):
         x = self.relu(self.linear(x))
@@ -84,13 +84,13 @@ class Attention1dPoolingHead(nn.Module):
     """Outputs of the model with the attention1d"""
 
     def __init__(
-        self, config
+        self, hidden_size: int, num_labels: int
     ):  # [batch x sequence(751) x embedding (1280)] --> [batch x embedding] --> [batch x 1]
         super(Attention1dPoolingHead, self).__init__()
-        self.attention1d = Attention1dPooling(config)
-        self.attention1d_projection = Attention1dPoolingProjection(config)
+        self.attention1d = Attention1dPooling(hidden_size)
+        self.attention1d_projection = Attention1dPoolingProjection(hidden_size, num_labels)
 
-    def forward(self, x, input_mask):
+    def forward(self, x, input_mask=None):
         x = self.attention1d(x, input_mask=input_mask.unsqueeze(-1))
         x = self.attention1d_projection(x)
         return x
