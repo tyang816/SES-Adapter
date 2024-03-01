@@ -25,6 +25,7 @@ warnings.filterwarnings("ignore")
 
 def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer):
     best_acc = 0
+    val_acc_list = []
     loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
     for epoch in range(args.max_train_epochs):
@@ -36,6 +37,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
         model.eval()
         with torch.no_grad():
             val_loss, val_acc = loop(model, plm_model, accelerator, metrics, val_loader, loss_fn, epoch, use_wandb=args.wandb)
+            val_acc_list.append(val_acc)
             if args.wandb:
                 wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
         print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
@@ -45,6 +47,10 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
             torch.save(model.state_dict(), path)
             print(f'>>> BEST at epcoh {epoch}, acc: {best_acc:.4f}')
             print(f'>>> Save model to {path}')
+        
+        if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
+            print(f'>>> Early stopping at epoch {epoch}')
+            break
         
     print(f"TESTING: loading from {path}")
     model.load_state_dict(torch.load(path))
@@ -110,6 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_batch_token', type=int, default=3000, help='max number of token per batch')
     parser.add_argument('--max_train_epochs', type=int, default=10, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=1024, help='max sequence length')
+    parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     
