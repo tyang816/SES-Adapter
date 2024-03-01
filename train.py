@@ -3,6 +3,7 @@ import warnings
 import torch
 import os
 import sys
+sys.path.append(os.getcwd())
 import wandb
 import random
 import json
@@ -10,33 +11,31 @@ from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from transformers import logging
-from torchmetrics.classification import MulticlassAccuracy
+from torchmetrics.classification import Accuracy
 from accelerate import Accelerator
 from time import strftime, localtime
-from transformers import EsmTokenizer
+from transformers import EsmTokenizer, EsmModel
 from src.utils.data_utils import BatchSampler
 from src.models.locseek import LocSeekModel
 
-# set path
-current_dir=os.getcwd()
-sys.path.append(current_dir)
 # ignore warning information
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 
-def train(args, model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer):
+def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer):
     best_acc = 0
+    loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
         model.train()
-        train_loss, train_acc = loop(model, accelerator, metrics, train_loader, epoch, optimizer, use_wandb=args.wandb)
+        train_loss, train_acc = loop(model, plm_model, accelerator, metrics, train_loader, loss_fn, epoch, optimizer, use_wandb=args.wandb)
         print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
         
         model.eval()
         with torch.no_grad():
-            val_loss, val_acc = loop(model, accelerator, metrics, val_loader, epoch, use_wandb=args.wandb)
+            val_loss, val_acc = loop(model, plm_model, accelerator, metrics, val_loader, loss_fn, epoch, use_wandb=args.wandb)
             if args.wandb:
                 wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
         print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
@@ -51,26 +50,24 @@ def train(args, model, accelerator, metrics, train_loader, val_loader, test_load
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        loss, acc = loop(model, accelerator, metrics, test_loader, use_wandb=args.wandb)
+        loss, acc = loop(model, plm_model, accelerator, metrics, test_loader, loss_fn, use_wandb=args.wandb)
         if args.wandb:
             wandb.log({"test/test_loss": loss, "test/test_acc": acc})
     print(f'TEST loss: {loss:.4f} acc: {acc:.4f}')
 
     
-def loop(model, accelerator, metrics, dataloader, epoch=0, optimizer=None, use_wandb=False):
+def loop(model, plm_model, accelerator, metrics, dataloader, loss_fn, epoch=0, optimizer=None, use_wandb=False):
     total_loss, total_acc = 0, 0
     iter_num = len(dataloader)
     global_steps = epoch * len(dataloader)
     epoch_iterator = tqdm(dataloader)
-    loss_fn = nn.CrossEntropyLoss()
+    
     for batch in epoch_iterator:
         label = batch["label"]
-        logits = model(batch)
-        print(logits.shape, label.shape)
-        loss = loss_fn(logits.squeeze(-1), label)
+        logits = model(plm_model, batch)
+        loss = loss_fn(logits, label)
         total_loss += loss.item()
-        
-        acc = metrics(logits.squeeze(-1), label)
+        acc = metrics(logits, label).item()
         total_acc += acc
         
         global_steps += 1
@@ -95,11 +92,11 @@ if __name__ == "__main__":
 
     # model params
     parser.add_argument('--hidden_size', type=int, default=512, help='embedding hidden size of the model')
-    parser.add_argument('--intermediate_size', type=int, default=1280, help='intermediate size of the model')
     parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--esm_model_name', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
     parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
+    parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     
     # dataset
     parser.add_argument('--train_file', type=str, default=None, help='train file')
@@ -108,8 +105,14 @@ if __name__ == "__main__":
     
     # train model
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
+    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
+    parser.add_argument('--batch_size', type=int, default=4, help='batch size')
     parser.add_argument('--max_batch_token', type=int, default=3000, help='max number of token per batch')
     parser.add_argument('--max_train_epochs', type=int, default=10, help='training epochs')
+    parser.add_argument('--max_seq_len', type=int, default=1024, help='max sequence length')
+    parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
+    parser.add_argument('--use_ss8', action='store_true', help='use ss8')
+    
     
     # save model
     parser.add_argument('--model_name', type=str, default=None, help='model name')
@@ -137,15 +140,26 @@ if __name__ == "__main__":
     if args.ckpt_dir is None:
         current_date = strftime("%Y%m%d", localtime())
         args.ckpt_dir = os.path.join(args.ckpt_root, current_date)
+    else:
+        args.ckpt_dir = os.path.join(args.ckpt_root, args.ckpt_dir)
     os.makedirs(args.ckpt_dir, exist_ok=True)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    plm_model = EsmModel.from_pretrained(args.esm_model_name).to(device).eval()
+    for param in plm_model.parameters():
+        param.requires_grad = False
+    
     model = LocSeekModel(args)
     model.to(device)
 
-    def get_trainable_params(model):
-        return [p for p in model.parameters() if p.requires_grad]
-    print(f">>> Trainable parameters: {sum(p.numel() for p in get_trainable_params(model))/1e6:.2f}M")
+    def param_num(model):
+        total = sum([param.numel() for param in model.parameters() if param.requires_grad])
+        num_M = total/1e6
+        if num_M >= 1000:
+            return "Number of parameter: %.2fB" % (num_M/1e3)
+        else:
+            return "Number of parameter: %.2fM" % (num_M)
+    print(param_num(model))
     
     def load_dataset(file):
         dataset, token_num = [], []
@@ -159,12 +173,19 @@ if __name__ == "__main__":
     val_dataset, val_token_num = load_dataset(args.val_file)
     test_dataset, test_token_num = load_dataset(args.test_file)
     
+    # train_dataset = json.load(open(args.train_file))
+    # train_token_num = [len(d["sequence"]) for d in train_dataset]
+    # val_dataset = json.load(open(args.val_file))
+    # val_token_num = [len(d["sequence"]) for d in val_dataset]
+    # test_dataset = json.load(open(args.test_file))
+    # test_token_num = [len(d["sequence"]) for d in test_dataset]
+    
     print(">>> trainset: ", len(train_dataset))
     print(">>> valset: ", len(val_dataset))
     print(">>> testset: ", len(test_dataset))
     print("---------- Smple 3 data point from trainset ----------")
     
-    for i in random.sample(range(len(train_dataset)), 3):
+    for i in random.sample(range(len(train_dataset)), 2):
         print(">>> ", train_dataset[i])
     
     aa_tokenizer = EsmTokenizer.from_pretrained(args.esm_model_name)
@@ -174,9 +195,9 @@ if __name__ == "__main__":
     def collate_fn(examples):
         aa_seq, foldseek_seq, ss8_seq, label = [], [], [], []
         for e in examples:
-            aa_seq.append(e["aa_seq"])
-            foldseek_seq.append(e["foldseek_seq"])
-            ss8_seq.append(e["ss8_seq"])
+            aa_seq.append(e["aa_seq"][:args.max_seq_len])
+            foldseek_seq.append(e["foldseek_seq"][:args.max_seq_len])
+            ss8_seq.append(e["ss8_seq"][:args.max_seq_len])
             label.append(e["label"])
         
         aa_inputs = aa_tokenizer(aa_seq, return_tensors="pt", padding=True, truncation=True)
@@ -191,36 +212,24 @@ if __name__ == "__main__":
             "attention_mask": attention_mask, 
             "foldseek_input_ids": foldseek_input_ids, 
             "ss8_input_ids": ss8_input_ids,
-            "label": torch.as_tensor(label, dtype=torch.float32).to(device)
+            "label": torch.as_tensor(label, dtype=torch.long).to(device)
             }
         
     
     accelerator = Accelerator()
-    metrics = MulticlassAccuracy(num_classes=args.num_labels)
+    metrics = Accuracy(task="multiclass", num_classes=args.num_labels).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     
-    train_loader = DataLoader(
-        train_dataset, 
-        batch_sampler=BatchSampler(train_token_num, max_batch_nodes=args.max_batch_token), 
-        collate_fn=collate_fn
-        )
-    val_loader = DataLoader(
-        val_dataset, 
-        batch_sampler=BatchSampler(val_token_num, max_batch_nodes=args.max_batch_token, shuffle=False), 
-        collate_fn=collate_fn
-        )
-    test_loader = DataLoader(
-        test_dataset, 
-        batch_sampler=BatchSampler(test_token_num, max_batch_nodes=args.max_batch_token, shuffle=False), 
-        collate_fn=collate_fn
-        )
+    train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, shuffle=False, batch_size=args.batch_size, collate_fn=collate_fn)
+    test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch_size, collate_fn=collate_fn)
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
         model, optimizer, train_loader, val_loader, test_loader
     )
     
     print("---------- Start Training ----------")
-    train(args, model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer)
+    train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer)
     
     if args.wandb:
         wandb.finish()

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from transformers.activations import ACT2FN
 
 class MaskedConv1d(nn.Conv1d):
     """A masked 1-dimensional convolution layer.
@@ -110,3 +110,35 @@ class MeanPooling(nn.Module):
         else:
             mean_pooled_features = torch.mean(features, dim=1)
         return mean_pooled_features
+
+
+class MeanPoolingProjection(nn.Module):
+    """Mean Pooling with a projection layer for sentence-level classification tasks."""
+
+    def __init__(self, hidden_size, num_labels):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dropout = nn.Dropout(0.0)
+        self.out_proj = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, mean_pooled_features):
+        x = self.dropout(mean_pooled_features)
+        x = self.dense(x)
+        x = ACT2FN['gelu'](x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
+
+
+class MeanPoolingHead(nn.Module):
+    """Mean Pooling Head for sentence-level classification tasks."""
+
+    def __init__(self, hidden_size, num_labels):
+        super().__init__()
+        self.mean_pooling = MeanPooling()
+        self.mean_pooling_projection = MeanPoolingProjection(hidden_size, num_labels)
+
+    def forward(self, features, input_mask=None):
+        mean_pooling_features = self.mean_pooling(features, input_mask=input_mask)
+        x = self.mean_pooling_projection(mean_pooling_features)
+        return x

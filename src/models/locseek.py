@@ -1,9 +1,10 @@
 import torch
+import gc
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 from transformers import EsmModel
-from src.models.pooling import Attention1dPoolingHead
+from src.models.pooling import Attention1dPoolingHead, MeanPoolingHead
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)
@@ -116,33 +117,41 @@ class LocSeekModel(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.model = EsmModel.from_pretrained(config.esm_model_name).eval()
-        self.pooling_method = Attention1dPoolingHead(config.hidden_size, config.num_labels)
-        self.foldseek_embedding = nn.Embedding(20, config.hidden_size)
-        self.ss_embedding = nn.Embedding(8, config.hidden_size)
         
-        self.cross_attention_ss = CrossModalAttention(config)
+        self.foldseek_embedding = nn.Embedding(28, config.hidden_size)
+        self.ss_embedding = nn.Embedding(16, config.hidden_size)
+        
         self.cross_attention_foldseek = CrossModalAttention(config)
+        self.cross_attention_ss = CrossModalAttention(config)
 
-    def forward(self, batch):
+        if config.pooling_method == 'attention1d':
+            self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels)
+        elif config.pooling_method == 'mean':
+            self.pooling = MeanPoolingHead(config.hidden_size, config.num_labels)
+        else:
+            raise ValueError(f"Pooling method {config.pooling_method} not supported")
+    
+    @torch.no_grad()
+    def plm_embedding(self, plm_model, aa_seq, attention_mask):
+        outputs = plm_model(aa_seq, attention_mask=attention_mask)
+        seq_embeds = outputs.last_hidden_state
+        gc.collect()
+        torch.cuda.empty_cache()
+        return seq_embeds
+    
+    def forward(self, plm_model, batch):
         aa_seq, ss_seq, foldseek_seq, attention_mask = batch['aa_input_ids'], batch['ss8_input_ids'], batch['foldseek_input_ids'], batch['attention_mask']
+        # aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
         
-        with torch.no_grad():
-            outputs = self.model(aa_seq, attention_mask=attention_mask)
-            seq_embeds = outputs.last_hidden_state
+        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
-        ss_embeds = self.ss_embedding(ss_seq)
         foldseek_embeds = self.foldseek_embedding(foldseek_seq)
+        ss_embeds = self.ss_embedding(ss_seq)
         
-        # 使用氨基酸序列信息引导二级结构信息的理解
-        ss_context = self.cross_attention_ss(seq_embeds, ss_embeds, ss_embeds, attention_mask)
+        foldseek_context = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
+        ss_context = self.cross_attention_ss(ss_embeds, foldseek_context, foldseek_context, attention_mask)
         
-        # 结合二级结构和FoldSeek信息
-        foldseek_context = self.cross_attention_foldseek(ss_context, foldseek_embeds, foldseek_embeds, attention_mask)
-        
-        # 将氨基酸序列、二级结构上下文、FoldSeek上下文聚合
-        print(foldseek_context.shape)
-        final_embeds = self.pooling_method(foldseek_context, attention_mask)
-        print(final_embeds.shape)
-        return final_embeds
+        logits = self.pooling(ss_context, attention_mask)
+        # logits = self.pooling(seq_embeds, attention_mask)
+        return logits
        
