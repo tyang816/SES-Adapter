@@ -20,7 +20,7 @@ do
     do
         for lr in 1e-3 1e-4 1e-5
         do
-            sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2,lr=$lr,pdb_type=$pdb_type --job-name=$dataset_type"_"$pooling_method"_"$pdb_type script/slurm/train.slurm
+            sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2,lr=$lr,pdb_type=$pdb_type --job-name=deeploc-1_binary_"$pooling_method"_"$pdb_type" script/slurm/train.slurm
         done
     done
 done
@@ -32,7 +32,7 @@ do
     do
         for lr in 1e-3 1e-4 1e-5
         do
-            sbatch --export=dataset_type=deeploc-1_multi,pooling_method=$pooling_method,num_labels=11,lr=$lr,pdb_type=$pdb_type --job-name=$dataset_type"_"$pooling_method"_"$pdb_type script/slurm/train.slurm
+            sbatch --export=dataset_type=deeploc-1_multi,pooling_method=$pooling_method,num_labels=11,lr=$lr,pdb_type=$pdb_type --job-name=deeploc-1_multi_"$pooling_method"_"$pdb_type" script/slurm/train.slurm
         done
     done
 done
@@ -42,6 +42,6 @@ for pooling_method in attention1d mean light_attention
 do
     for lr in 1e-3 1e-4 1e-5
     do
-        sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,num_labels=2,lr=$lr,pdb_type=ef --job-name=$dataset_type"_"$pooling_method"_"ef script/slurm/train.slurm
+        sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,num_labels=2,lr=$lr,pdb_type=ef --job-name=deepsol_"$pooling_method"_ef script/slurm/train.slurm
     done
 done
