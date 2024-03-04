@@ -118,11 +118,12 @@ class LocSeekModel(nn.Module):
         super().__init__()
         self.config = config
         
-        self.foldseek_embedding = nn.Embedding(28, config.hidden_size)
-        self.ss_embedding = nn.Embedding(16, config.hidden_size)
-        
-        self.cross_attention_foldseek = CrossModalAttention(config)
-        self.cross_attention_ss = CrossModalAttention(config)
+        if config.use_foldseek:
+            self.foldseek_embedding = nn.Embedding(28, config.hidden_size)
+            self.cross_attention_foldseek = CrossModalAttention(config)
+        if config.use_ss8:
+            self.ss_embedding = nn.Embedding(16, config.hidden_size)
+            self.cross_attention_ss = CrossModalAttention(config)
 
         if config.pooling_method == 'attention1d':
             self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels)
@@ -142,18 +143,19 @@ class LocSeekModel(nn.Module):
         return seq_embeds
     
     def forward(self, plm_model, batch):
-        aa_seq, ss_seq, foldseek_seq, attention_mask = batch['aa_input_ids'], batch['ss8_input_ids'], batch['foldseek_input_ids'], batch['attention_mask']
-        # aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
-        
-        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
+        aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
+        embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
-        foldseek_embeds = self.foldseek_embedding(foldseek_seq)
-        ss_embeds = self.ss_embedding(ss_seq)
+        if self.config.use_foldseek:
+            foldseek_seq = batch['foldseek_input_ids']
+            foldseek_embeds = self.foldseek_embedding(foldseek_seq)
+            embeds = self.cross_attention_foldseek(foldseek_embeds, embeds, embeds, attention_mask)
         
-        foldseek_context = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
-        ss_context = self.cross_attention_ss(ss_embeds, foldseek_context, foldseek_context, attention_mask)
+        if self.config.use_ss8:
+            ss_seq = batch['ss8_input_ids']
+            ss_embeds = self.ss_embedding(ss_seq)
+            embeds = self.cross_attention_ss(ss_embeds, embeds, embeds, attention_mask)  
         
-        logits = self.pooling(ss_context, attention_mask)
-        # logits = self.pooling(seq_embeds, attention_mask)
+        logits = self.pooling(embeds, attention_mask)
         return logits
        

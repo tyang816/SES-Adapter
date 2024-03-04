@@ -30,6 +30,8 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --max_train_epochs 50 \
     --max_seq_len 2048 \
     --patience 10 \
+    --use_foldseek \
+    --use_ss8 \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
     --model_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
