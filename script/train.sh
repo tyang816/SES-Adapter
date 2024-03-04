@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --esm_model_name facebook/esm2_t33_650M_UR50D \
     --num_labels 11 \
-    --pooling_method light_attention \
+    --pooling_method mean \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \

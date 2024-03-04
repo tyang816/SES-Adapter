@@ -6,12 +6,13 @@
 #SBATCH --gres=gpu:1 
 #SBATCH --cpus-per-task=16
 #SBATCH --time=180-00:00:00
-#SBATCH --output=/public/home/tanyang/workspace/DATA/esmfold/log/%j.out
-#SBATCH --error=/public/home/tanyang/workspace/DATA/esmfold/log/%j.err
+#SBATCH --output=/public/home/tanyang/workspace/LocSeek/log/%j.out
+#SBATCH --error=/public/home/tanyang/workspace/LocSeek/log/%j.err
 
-proxy_on
-cd /public/home/tanyang/workspace/LocSeek
+source ~/.zshrc
+zsh
 conda activate protssn
+cd /public/home/tanyang/workspace/LocSeek
 
 
 CUDA_VISIBLE_DEVICES=0 python train.py \
@@ -31,7 +32,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --patience 10 \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
-    --model_name "$dataset_type"_$pdb_type_"$pooling_method"_"$lr".pt \
+    --model_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_$pdb_type_"$pooling_method"_"$lr"
+    --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
