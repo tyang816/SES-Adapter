@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 from transformers import EsmModel
-from src.models.pooling import Attention1dPoolingHead, MeanPoolingHead
+from src.models.pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)
@@ -128,6 +128,8 @@ class LocSeekModel(nn.Module):
             self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels)
         elif config.pooling_method == 'mean':
             self.pooling = MeanPoolingHead(config.hidden_size, config.num_labels)
+        elif config.pooling_method == 'light_attention':
+            self.pooling = LightAttentionPoolingHead(config.hidden_size, config.num_labels)
         else:
             raise ValueError(f"Pooling method {config.pooling_method} not supported")
     

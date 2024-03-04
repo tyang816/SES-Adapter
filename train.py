@@ -180,13 +180,6 @@ if __name__ == "__main__":
     val_dataset, val_token_num = load_dataset(args.val_file)
     test_dataset, test_token_num = load_dataset(args.test_file)
     
-    # train_dataset = json.load(open(args.train_file))
-    # train_token_num = [len(d["sequence"]) for d in train_dataset]
-    # val_dataset = json.load(open(args.val_file))
-    # val_token_num = [len(d["sequence"]) for d in val_dataset]
-    # test_dataset = json.load(open(args.test_file))
-    # test_token_num = [len(d["sequence"]) for d in test_dataset]
-    
     print(">>> trainset: ", len(train_dataset))
     print(">>> valset: ", len(val_dataset))
     print(">>> testset: ", len(test_dataset))
