@@ -28,14 +28,13 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 1 \
+    --max_train_epochs 50 \
     --max_batch_token 100000 \
     --patience 10 \
     --monitor val_loss \
-    --use_ss8 \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
-    --model_name wofs_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
+    --model_name woss_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name wofs_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
+    --wandb_run_name woss_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
