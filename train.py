@@ -55,7 +55,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, acc: {best_val_acc:.4f}')
+                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
                 print(f'>>> Save model to {path}')
             
             if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
@@ -66,7 +66,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}')
+                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
                 print(f'>>> Save model to {path}')
             
             if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:

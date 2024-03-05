@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --use_foldseek \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
-    --model_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
+    --model_name woss_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
+    --wandb_run_name woss_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"

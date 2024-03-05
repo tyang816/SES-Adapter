@@ -2,7 +2,7 @@
 dataset_type=deepsol
 # pooling_method: attention1d mean light_attention
 pooling_method=attention1d
-# num_labels: 2 11
+# num_labels: 2 10
 num_labels=2
 # pdb_type: ef af
 pdb_type=ef

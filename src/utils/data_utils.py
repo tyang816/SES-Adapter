@@ -88,8 +88,6 @@ def extract_seq_from_pdb(pdb_file, chain=None):
 
 class BatchSampler(data.Sampler):
     '''
-    From https://github.com/jingraham/neurips19-graph-protein-design.
-    
     A `torch.utils.data.Sampler` which samples batches according to a
     maximum number of graph nodes.
     

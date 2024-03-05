@@ -20,8 +20,8 @@ cd /public/home/tanyang/workspace/LocSeek
 
 CUDA_VISIBLE_DEVICES=0 python train.py \
     --plm_model facebook/esm2_t33_650M_UR50D \
-    --num_attention_heads 8 \
     --num_labels $num_labels \
+    --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --use_ss8 \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
-    --model_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
+    --model_name wofs_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
+    --wandb_run_name wofs_"$dataset_type"_"$pdb_type"_"$pooling_method"_"$lr"
