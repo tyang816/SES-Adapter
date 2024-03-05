@@ -112,10 +112,14 @@ class BatchSampler(data.Sampler):
         idx = self.idx
         while idx:
             batch = []
-            n_nodes = 0
-            while idx and n_nodes + self.node_counts[idx[0]] <= self.max_batch_nodes:
+            max_n_node = 0
+            while idx:
+                if max(self.node_counts[idx[0]], max_n_node) * (len(batch) + 1) > self.max_batch_nodes:
+                    break
                 next_idx, idx = idx[0], idx[1:]
-                n_nodes += self.node_counts[next_idx]
+                current_n_node = self.node_counts[next_idx]
+                if current_n_node > max_n_node:
+                    max_n_node = current_n_node
                 batch.append(next_idx)
             self.batches.append(batch)
     
