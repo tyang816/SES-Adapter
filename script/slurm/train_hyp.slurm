@@ -13,14 +13,14 @@ source ~/.bashrc
 conda activate protssn
 cd /public/home/tanyang/clash-for-linux-backup-main
 bash start.sh
-source /etc/profile.d/clash.sh
 proxy_on
 cd /public/home/tanyang/workspace/LocSeek
 
+
 CUDA_VISIBLE_DEVICES=0 python train.py \
-    --num_attention_heads 8 \
-    --plm_model facebook/esm2_t33_650M_UR50D \
+    --plm_model ckpt/esm2_t33_650M_UR50D \
     --num_labels $num_labels \
+    --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.25 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \

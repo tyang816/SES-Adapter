@@ -1,12 +1,12 @@
-pdb_type=ef
 # dataset: deeploc-1_binary deeploc-1_multi deepsol
-# dataset_type=deeploc-1_multi
-dataset_type=deepsol
+dataset_type=deeploc-1_binary
+num_labels=2
+pdb_type=ef
 pooling_head=attention1d
 CUDA_VISIBLE_DEVICES=1 python train.py \
-    --plm_model facebook/esm2_t33_650M_UR50D \
-    --num_attention_heads 2 \
-    --num_labels 10 \
+    --plm_model ckpt/esm2_t33_650M_UR50D \
+    --num_labels $num_labels \
+    --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.25 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \

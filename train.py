@@ -30,92 +30,133 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     val_loss_list, val_acc_list = [], []
     loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
+    
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
+        
+        # train
         model.train()
-        train_loss, train_acc = loop(
-            model, plm_model, accelerator, metrics, train_loader, loss_fn, epoch,
-            optimizer, use_wandb=args.wandb, device=device
-            )
+        total_loss, total_acc = 0, 0
+        iter_num = len(train_loader)
+        global_steps = epoch * len(train_loader)
+        epoch_iterator = tqdm(train_loader)
+        for batch in epoch_iterator:
+            with accelerator.accumulate(model):
+                for k, v in batch.items():
+                    batch[k] = v.to(device)
+                label = batch["label"]
+                logits = model(plm_model, batch)
+                loss = loss_fn(logits, label)
+                total_loss += loss.item()
+                acc = metrics(logits, label).item()
+                total_acc += acc
+                
+                global_steps += 1
+                accelerator.backward(loss)
+                optimizer.step()
+                optimizer.zero_grad()
+                epoch_iterator.set_postfix(train_loss=loss.item(), train_acc=acc)
+                if args.wandb:
+                    wandb.log({"train/train_loss": loss.item(), "train/train_acc": acc, "train/epoch": epoch}, step=global_steps)
+                
+                # eval every n steps
+                if global_steps % args.eval_every_n_steps == 0 and args.eval_every_n_steps > 0:
+                    model.eval()
+                    with torch.no_grad():
+                        val_loss, val_acc = eval_loop(model, plm_model, metrics, val_loader, loss_fn, device)
+                        val_acc_list.append(val_acc)
+                        val_loss_list.append(val_loss)
+                        if args.wandb:
+                            wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch}, step=global_steps)
+                    print(f'>>> Steps {global_steps} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
+                    model.train()
+                    
+                    # early stopping
+                    if args.monitor == "val_acc":
+                        if val_acc > best_val_acc:
+                            best_val_acc = val_acc
+                            torch.save(model.state_dict(), path)
+                            print(f'>>> BEST at steps {global_steps}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
+                            print(f'>>> Save model to {path}')
+                            
+                        if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
+                            print(f'>>> Early stopping at steps {global_steps}')
+                            break
+                    
+                    if args.monitor == "val_loss":
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            torch.save(model.state_dict(), path)
+                            print(f'>>> BEST at steps {global_steps}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
+                            print(f'>>> Save model to {path}')
+                        
+                        if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
+                            print(f'>>> Early stopping at steps {global_steps}')
+                            break
+                    
+        train_loss = total_loss / iter_num
+        train_acc = total_acc / iter_num
         print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
         
-        model.eval()
-        with torch.no_grad():
-            val_loss, val_acc = loop(
-                model, plm_model, accelerator, metrics, val_loader, loss_fn, epoch, 
-                use_wandb=args.wandb, device=device
-                )
-            val_acc_list.append(val_acc)
-            val_loss_list.append(val_loss)
-            if args.wandb:
-                wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
-        print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
+        # eval every epoch
+        if args.eval_every_n_steps < 0:
+            model.eval()
+            with torch.no_grad():
+                val_loss, val_acc = eval_loop(model, plm_model, metrics, val_loader, loss_fn, device)
+                val_acc_list.append(val_acc)
+                val_loss_list.append(val_loss)
+                if args.wandb:
+                    wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
+            print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
         
-        if args.monitor == "val_acc":
-            if val_acc > best_val_acc:
-                best_val_acc = val_acc
-                torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
-                print(f'>>> Save model to {path}')
+            # early stopping
+            if args.monitor == "val_acc":
+                if val_acc > best_val_acc:
+                    best_val_acc = val_acc
+                    torch.save(model.state_dict(), path)
+                    print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
+                    print(f'>>> Save model to {path}')
+                
+                if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
+                    print(f'>>> Early stopping at epoch {epoch}')
+                    break
             
-            if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
-                print(f'>>> Early stopping at epoch {epoch}')
-                break
-        
-        if args.monitor == "val_loss":
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
-                print(f'>>> Save model to {path}')
-            
-            if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
-                print(f'>>> Early stopping at epoch {epoch}')
-                break
+            if args.monitor == "val_loss":
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    torch.save(model.state_dict(), path)
+                    print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
+                    print(f'>>> Save model to {path}')
+                
+                if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
+                    print(f'>>> Early stopping at epoch {epoch}')
+                    break
         
     print(f"TESTING: loading from {path}")
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        loss, acc = loop(
-            model, plm_model, accelerator, metrics, test_loader, loss_fn, 
-            use_wandb=args.wandb, device=device
-            )
+        test_loss, test_acc = eval_loop(model, plm_model, metrics, test_loader, loss_fn, device)
         if args.wandb:
-            wandb.log({"test/test_loss": loss, "test/test_acc": acc})
+            wandb.log({"test/test_loss": test_loss, "test/test_acc": test_acc}, step=global_steps)
     print(f'TEST loss: {loss:.4f} acc: {acc:.4f}')
 
-    
-def loop(model, plm_model, accelerator, metrics, dataloader, loss_fn, 
-         epoch=0, optimizer=None, use_wandb=False, device=None):
-    
+
+def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
     total_loss, total_acc = 0, 0
     iter_num = len(dataloader)
-    global_steps = epoch * len(dataloader)
     epoch_iterator = tqdm(dataloader)
     
     for batch in epoch_iterator:
-        with accelerator.accumulate(model):
-            for k, v in batch.items():
-                batch[k] = v.to(device)
-            label = batch["label"]
-            logits = model(plm_model, batch)
-            loss = loss_fn(logits, label)
-            total_loss += loss.item()
-            acc = metrics(logits, label).item()
-            total_acc += acc
-            
-            global_steps += 1
-            
-            if optimizer:
-                accelerator.backward(loss)
-                optimizer.step()
-                optimizer.zero_grad()
-                epoch_iterator.set_postfix(train_loss=loss.item(), train_acc=acc)
-                if use_wandb:
-                    wandb.log({"train/train_loss": loss.item(), "train/train_acc": acc, "train/epoch": epoch}, step=global_steps)
-            else:
-                epoch_iterator.set_postfix(eval_loss=loss.item(), eval_acc=acc)
+        for k, v in batch.items():
+            batch[k] = v.to(device)
+        label = batch["label"]
+        logits = model(plm_model, batch)
+        loss = loss_fn(logits, label)
+        total_loss += loss.item()
+        acc = metrics(logits, label).item()
+        total_acc += acc
+        epoch_iterator.set_postfix(eval_loss=loss.item(), eval_acc=acc)
     
     epoch_loss = total_loss / iter_num
     epoch_acc = total_acc / iter_num
@@ -150,6 +191,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default='val_acc', choices=['val_acc','val_loss'], help='monitor metric')
+    parser.add_argument('--eval_every_n_steps', type=int, default=-1, help='evaluate every n steps')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     
