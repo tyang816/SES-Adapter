@@ -69,14 +69,17 @@ class Attention1dPooling(nn.Module):
         return out
 
 class Attention1dPoolingProjection(nn.Module):
-    def __init__(self, hidden_size, num_labels) -> None:
+    def __init__(self, hidden_size, num_labels, dropout=0.25) -> None:
         super(Attention1dPoolingProjection, self).__init__()
         self.linear = nn.Linear(hidden_size, hidden_size)
+        self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.final = nn.Linear(hidden_size, num_labels)
 
     def forward(self, x):
-        x = self.relu(self.linear(x))
+        x = self.linear(x)
+        x = self.dropout(x)
+        x = self.relu(x)
         x = self.final(x)
         return x
 
@@ -84,11 +87,11 @@ class Attention1dPoolingHead(nn.Module):
     """Outputs of the model with the attention1d"""
 
     def __init__(
-        self, hidden_size: int, num_labels: int
+        self, hidden_size: int, num_labels: int, dropout: float = 0.25
     ):  # [batch x sequence(751) x embedding (1280)] --> [batch x embedding] --> [batch x 1]
         super(Attention1dPoolingHead, self).__init__()
         self.attention1d = Attention1dPooling(hidden_size)
-        self.attention1d_projection = Attention1dPoolingProjection(hidden_size, num_labels)
+        self.attention1d_projection = Attention1dPoolingProjection(hidden_size, num_labels, dropout)
 
     def forward(self, x, input_mask=None):
         x = self.attention1d(x, input_mask=input_mask.unsqueeze(-1))
@@ -115,10 +118,10 @@ class MeanPooling(nn.Module):
 class MeanPoolingProjection(nn.Module):
     """Mean Pooling with a projection layer for sentence-level classification tasks."""
 
-    def __init__(self, hidden_size, num_labels):
+    def __init__(self, hidden_size, num_labels, dropout=0.25):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(0.0)
+        self.dropout = nn.Dropout(dropout)
         self.out_proj = nn.Linear(hidden_size, num_labels)
 
     def forward(self, mean_pooled_features):
@@ -133,10 +136,10 @@ class MeanPoolingProjection(nn.Module):
 class MeanPoolingHead(nn.Module):
     """Mean Pooling Head for sentence-level classification tasks."""
 
-    def __init__(self, hidden_size, num_labels):
+    def __init__(self, hidden_size, num_labels, dropout=0.25):
         super().__init__()
         self.mean_pooling = MeanPooling()
-        self.mean_pooling_projection = MeanPoolingProjection(hidden_size, num_labels)
+        self.mean_pooling_projection = MeanPoolingProjection(hidden_size, num_labels, dropout)
 
     def forward(self, features, input_mask=None):
         mean_pooling_features = self.mean_pooling(features, input_mask=input_mask)

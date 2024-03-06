@@ -126,11 +126,11 @@ class LocSeekModel(nn.Module):
             self.cross_attention_ss = CrossModalAttention(config)
 
         if config.pooling_method == 'attention1d':
-            self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels)
+            self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         elif config.pooling_method == 'mean':
-            self.pooling = MeanPoolingHead(config.hidden_size, config.num_labels)
+            self.pooling = MeanPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         elif config.pooling_method == 'light_attention':
-            self.pooling = LightAttentionPoolingHead(config.hidden_size, config.num_labels)
+            self.pooling = LightAttentionPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         else:
             raise ValueError(f"Pooling method {config.pooling_method} not supported")
     

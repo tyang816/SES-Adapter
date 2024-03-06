@@ -132,6 +132,7 @@ if __name__ == "__main__":
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
     parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
+    parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
     parser.add_argument('--train_file', type=str, default=None, help='train file')

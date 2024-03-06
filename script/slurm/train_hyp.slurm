@@ -22,6 +22,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --plm_model facebook/esm2_t33_650M_UR50D \
     --num_labels $num_labels \
     --pooling_method $pooling_method \
+    --pooling_dropout 0.25 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \

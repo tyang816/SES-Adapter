@@ -22,6 +22,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
+    --pooling_dropout 0.25 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \

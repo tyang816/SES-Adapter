@@ -3,11 +3,12 @@ pdb_type=ef
 # dataset_type=deeploc-1_multi
 dataset_type=deepsol
 pooling_head=attention1d
-CUDA_VISIBLE_DEVICES=0 python train.py \
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --plm_model facebook/esm2_t33_650M_UR50D \
     --num_attention_heads 2 \
     --num_labels 10 \
     --pooling_method $pooling_head \
+    --pooling_dropout 0.25 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \
@@ -23,5 +24,6 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
     --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_debug.pt \
+    --wandb \
     --wandb_project LocSeek_debug \
     --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_head"
