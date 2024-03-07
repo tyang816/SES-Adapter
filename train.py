@@ -30,15 +30,13 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     val_loss_list, val_acc_list = [], []
     loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
-    
+    global_steps = 0
+    train_iter_num = len(train_loader)
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
-        
         # train
         model.train()
-        total_loss, total_acc = 0, 0
-        iter_num = len(train_loader)
-        global_steps = epoch * len(train_loader)
+        epoch_train_loss, epoch_train_acc = 0, 0
         epoch_iterator = tqdm(train_loader)
         for batch in epoch_iterator:
             with accelerator.accumulate(model):
@@ -47,9 +45,9 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                 label = batch["label"]
                 logits = model(plm_model, batch)
                 loss = loss_fn(logits, label)
-                total_loss += loss.item()
+                epoch_train_loss += loss.item()
                 acc = metrics(logits, label).item()
-                total_acc += acc
+                epoch_train_acc += acc
                 
                 global_steps += 1
                 accelerator.backward(loss)
@@ -94,8 +92,8 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                             print(f'>>> Early stopping at steps {global_steps}')
                             break
                     
-        train_loss = total_loss / iter_num
-        train_acc = total_acc / iter_num
+        train_loss = epoch_train_loss / train_iter_num
+        train_acc = epoch_train_acc / train_iter_num
         print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
         
         # eval every epoch
@@ -138,7 +136,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     with torch.no_grad():
         test_loss, test_acc = eval_loop(model, plm_model, metrics, test_loader, loss_fn, device)
         if args.wandb:
-            wandb.log({"test/test_loss": test_loss, "test/test_acc": test_acc}, step=global_steps)
+            wandb.log({"test/test_loss": test_loss, "test/test_acc": test_acc})
     print(f'TEST loss: {test_loss:.4f} acc: {test_acc:.4f}')
 
 
@@ -192,8 +190,8 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default='val_acc', choices=['val_acc','val_loss'], help='monitor metric')
     parser.add_argument('--eval_every_n_steps', type=int, default=-1, help='evaluate every n steps')
-    parser.add_argument('--use_foldseek', type=bool, default=True)
-    parser.add_argument('--use_ss8', type=bool, default=True)
+    parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
+    parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     
     # save model
     parser.add_argument('--model_name', type=str, default=None, help='model name')

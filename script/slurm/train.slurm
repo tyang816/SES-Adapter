@@ -9,6 +9,7 @@
 #SBATCH --output=/public/home/tanyang/workspace/LocSeek/log/%j.out
 #SBATCH --error=/public/home/tanyang/workspace/LocSeek/log/%j.err
 
+
 source ~/.bashrc
 conda activate protssn
 cd /public/home/tanyang/clash-for-linux-backup-main
@@ -31,9 +32,9 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 50 \
     --max_batch_token 100000 \
-    --patience 10 \
-    --use_foldseek $use_foldseek \
-    --use_ss8 $use_ss8 \
+    --patience 5 \
+    --use_foldseek \
+    --use_ss8 \
     --monitor val_loss \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \

@@ -8,16 +8,16 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
-    --pooling_dropout 0.25 \
+    --pooling_dropout 0 \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \
     --lr 1e-3 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 50 \
+    --max_train_epochs 1 \
     --max_batch_token 100000 \
-    --patience 10 \
+    --patience 5 \
     --monitor val_loss \
     --use_foldseek True \
     --use_ss8 True \
