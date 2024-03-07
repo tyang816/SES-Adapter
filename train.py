@@ -139,7 +139,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
         test_loss, test_acc = eval_loop(model, plm_model, metrics, test_loader, loss_fn, device)
         if args.wandb:
             wandb.log({"test/test_loss": test_loss, "test/test_acc": test_acc}, step=global_steps)
-    print(f'TEST loss: {loss:.4f} acc: {acc:.4f}')
+    print(f'TEST loss: {test_loss:.4f} acc: {test_acc:.4f}')
 
 
 def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
@@ -192,8 +192,8 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default='val_acc', choices=['val_acc','val_loss'], help='monitor metric')
     parser.add_argument('--eval_every_n_steps', type=int, default=-1, help='evaluate every n steps')
-    parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
-    parser.add_argument('--use_ss8', action='store_true', help='use ss8')
+    parser.add_argument('--use_foldseek', type=bool, default=True)
+    parser.add_argument('--use_ss8', type=bool, default=True)
     
     # save model
     parser.add_argument('--model_name', type=str, default=None, help='model name')

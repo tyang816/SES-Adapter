@@ -19,8 +19,8 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --max_batch_token 100000 \
     --patience 10 \
     --monitor val_loss \
-    --use_foldseek \
-    --use_ss8 \
+    --use_foldseek True \
+    --use_ss8 True \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
     --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_debug.pt \
