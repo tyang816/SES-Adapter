@@ -30,14 +30,14 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --lr 1e-3 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 50 \
+    --max_train_epochs 20 \
     --max_batch_token 100000 \
     --patience 5 \
     --use_ss8 \
     --monitor val_loss \
     --ckpt_root ckpt \
     --ckpt_dir $dataset_type \
-    --model_name "$dataset_type"_"ef"_"$pooling_method"_1e-3.pt \
+    --model_name wofs_"$dataset_type"_"ef"_"$pooling_method"_1e-3.pt \
     --wandb \
     --wandb_project LocSeek \
     --wandb_run_name "$dataset_type"_"ef"_"$pooling_method"_1e-3

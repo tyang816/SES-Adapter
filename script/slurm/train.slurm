@@ -30,7 +30,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --lr 1e-3 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 50 \
+    --max_train_epochs 20 \
     --max_batch_token 100000 \
     --patience 5 \
     --use_foldseek \
