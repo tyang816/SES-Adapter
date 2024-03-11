@@ -32,3 +32,12 @@ do
     sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,num_labels=2 --job-name=deepsol_"$pooling_method"_ef script/slurm/train.slurm
     sbatch --export=dataset_type=deeploc-1_multi,pooling_method=$pooling_method,num_labels=10 --job-name=deeploc-1_multi_"$pooling_method"_af script/slurm/train.slurm
 done
+
+# ablation for deeploc-1_binary
+for pooling_method in mean attention1d light_attention
+do
+    sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train.slurm
+    sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofsss.slurm
+    sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofs.slurm
+    sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_woss.slurm
+done

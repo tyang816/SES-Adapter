@@ -3,7 +3,6 @@ import gc
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
-from transformers import EsmModel
 from src.models.pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
 
 def rotate_half(x):
@@ -124,7 +123,9 @@ class LocSeekModel(nn.Module):
         if config.use_ss8:
             self.ss_embedding = nn.Embedding(16, config.hidden_size)
             self.cross_attention_ss = CrossModalAttention(config)
-
+        
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        
         if config.pooling_method == 'attention1d':
             self.pooling = Attention1dPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         elif config.pooling_method == 'mean':
@@ -144,18 +145,33 @@ class LocSeekModel(nn.Module):
     
     def forward(self, plm_model, batch):
         aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
-        embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
+        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
         if self.config.use_foldseek:
             foldseek_seq = batch['foldseek_input_ids']
             foldseek_embeds = self.foldseek_embedding(foldseek_seq)
-            embeds = self.cross_attention_foldseek(foldseek_embeds, embeds, embeds, attention_mask)
+            foldseek_embeds = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
+            embeds = seq_embeds + foldseek_embeds
+            embeds = self.layer_norm(embeds)
         
         if self.config.use_ss8:
             ss_seq = batch['ss8_input_ids']
             ss_embeds = self.ss_embedding(ss_seq)
-            embeds = self.cross_attention_ss(ss_embeds, embeds, embeds, attention_mask)  
+            
+            if self.config.use_foldseek:
+                # cross attention with foldseek
+                ss_embeds = self.cross_attention_ss(ss_embeds, embeds, embeds, attention_mask)
+                embeds = ss_embeds + embeds
+            else:
+                # cross attention with sequence
+                ss_embeds = self.cross_attention_ss(ss_embeds, seq_embeds, seq_embeds, attention_mask)
+                embeds = ss_embeds + seq_embeds
+            embeds = self.layer_norm(embeds)
         
-        logits = self.pooling(embeds, attention_mask)
+        if self.config.use_foldseek or self.config.use_ss8:
+            logits = self.pooling(embeds, attention_mask)
+        else:
+            logits = self.pooling(seq_embeds, attention_mask)
+        
         return logits
        

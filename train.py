@@ -31,7 +31,6 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
     global_steps = 0
-    train_iter_num = len(train_loader)
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
         # train
@@ -45,9 +44,9 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                 label = batch["label"]
                 logits = model(plm_model, batch)
                 loss = loss_fn(logits, label)
-                epoch_train_loss += loss.item()
+                epoch_train_loss += loss.item() * len(label)
                 acc = metrics(logits, label).item()
-                epoch_train_acc += acc
+                epoch_train_acc += acc * len(label)
                 
                 global_steps += 1
                 accelerator.backward(loss)
@@ -92,8 +91,8 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                             print(f'>>> Early stopping at steps {global_steps}')
                             break
                     
-        train_loss = epoch_train_loss / train_iter_num
-        train_acc = epoch_train_acc / train_iter_num
+        train_loss = epoch_train_loss / len(train_loader.dataset)
+        train_acc = epoch_train_acc / len(train_loader.dataset)
         print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
         
         # eval every epoch
@@ -112,7 +111,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                 if val_acc > best_val_acc:
                     best_val_acc = val_acc
                     torch.save(model.state_dict(), path)
-                    print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
+                    print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}, acc: {best_val_acc:.4f}')
                     print(f'>>> Save model to {path}')
                 
                 if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
@@ -142,7 +141,6 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
 
 def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
     total_loss, total_acc = 0, 0
-    iter_num = len(dataloader)
     epoch_iterator = tqdm(dataloader)
     
     for batch in epoch_iterator:
@@ -151,13 +149,13 @@ def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
         label = batch["label"]
         logits = model(plm_model, batch)
         loss = loss_fn(logits, label)
-        total_loss += loss.item()
+        total_loss += loss.item() * len(label)
         acc = metrics(logits, label).item()
-        total_acc += acc
+        total_acc += acc * len(label)
         epoch_iterator.set_postfix(eval_loss=loss.item(), eval_acc=acc)
     
-    epoch_loss = total_loss / iter_num
-    epoch_acc = total_acc / iter_num
+    epoch_loss = total_loss / len(dataloader.dataset)
+    epoch_acc = total_acc / len(dataloader.dataset)
     return epoch_loss, epoch_acc
 
 

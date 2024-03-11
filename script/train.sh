@@ -1,6 +1,6 @@
 # dataset: deeploc-1_binary deeploc-1_multi deepsol
-dataset_type=deeploc-1_binary
-num_labels=2
+dataset_type=deeploc-1_multi
+num_labels=10
 pdb_type=ef
 pooling_head=attention1d
 CUDA_VISIBLE_DEVICES=1 python train.py \
@@ -18,7 +18,9 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --max_train_epochs 50 \
     --max_batch_token 100000 \
     --patience 5 \
-    --monitor val_loss \
+    --use_foldseek \
+    --use_ss8 \
+    --monitor val_acc \
     --ckpt_root ckpt \
     --ckpt_dir facebook/esm2_t30_150M_UR50D/$dataset_type \
     --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_debug.pt \
