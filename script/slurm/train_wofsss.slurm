@@ -27,16 +27,16 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --train_file dataset/$dataset_type/ef"_train.json" \
     --val_file dataset/$dataset_type/ef"_val.json" \
     --test_file dataset/$dataset_type/ef"_test.json" \
-    --lr 5e-4 \
+    --lr 5e-5 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 30 \
+    --max_train_epochs 50 \
     --max_batch_token 100000 \
-    --patience 5 \
-    --monitor val_acc \
+    --patience 10 \
+    --monitor val_loss \
     --ckpt_root ckpt \
-    --ckpt_dir val_acc/$dataset_type \
-    --model_name wofsss_"$dataset_type"_"ef"_"$pooling_method"_5e-4.pt \
+    --ckpt_dir val_loss/$dataset_type \
+    --model_name wofsss_"$dataset_type"_"ef"_"$pooling_method"_5e-5.pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name wofsss_"$dataset_type"_"ef"_"$pooling_method"_5e-4
+    --wandb_run_name wofsss_"$dataset_type"_"ef"_"$pooling_method"_5e-5

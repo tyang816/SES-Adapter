@@ -12,11 +12,12 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \
-    --lr 1e-3 \
+    --lr 1e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 50 \
     --max_batch_token 100000 \
+    --loss_fn focal_loss \
     --patience 5 \
     --use_foldseek \
     --use_ss8 \

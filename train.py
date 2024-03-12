@@ -23,12 +23,34 @@ from src.models.locseek import LocSeekModel
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
+class MultiClassFocalLossWithAlpha(nn.Module):
+    def __init__(self, num_classes, alpha=None, gamma=2, reduction='mean', device="cuda"):
+        super(MultiClassFocalLossWithAlpha, self).__init__()
+        if alpha is None:
+            self.alpha = torch.ones(num_classes, dtype=torch.float32)
+        self.alpha = torch.tensor(alpha).to(device)
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, pred, target):
+        alpha = self.alpha[target]  # 为当前batch内的样本，逐个分配类别权重，shape=(bs), 一维向量
+        log_softmax = torch.log_softmax(pred, dim=1) # 对模型裸输出做softmax再取log, shape=(bs, 3)
+        logpt = torch.gather(log_softmax, dim=1, index=target.view(-1, 1))  # 取出每个样本在类别标签位置的log_softmax值, shape=(bs, 1)
+        logpt = logpt.view(-1)  # 降维，shape=(bs)
+        ce_loss = -logpt  # 对log_softmax再取负，就是交叉熵了
+        pt = torch.exp(logpt)  #对log_softmax取exp，把log消了，就是每个样本在类别标签位置的softmax值了，shape=(bs)
+        focal_loss = alpha * (1 - pt) ** self.gamma * ce_loss  # 根据公式计算focal loss，得到每个样本的loss值，shape=(bs)
+        if self.reduction == "mean":
+            return torch.mean(focal_loss)
+        if self.reduction == "sum":
+            return torch.sum(focal_loss)
+        return focal_loss
+
 
 def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, 
-          optimizer, device):
+          loss_fn, optimizer, device):
     best_val_loss, best_val_acc = float("inf"), 0
     val_loss_list, val_acc_list = [], []
-    loss_fn = nn.CrossEntropyLoss()
     path = os.path.join(args.ckpt_dir, args.model_name)
     global_steps = 0
     for epoch in range(args.max_train_epochs):
@@ -190,6 +212,7 @@ if __name__ == "__main__":
     parser.add_argument('--eval_every_n_steps', type=int, default=-1, help='evaluate every n steps')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
+    parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
     parser.add_argument('--model_name', type=str, default=None, help='model name')
@@ -273,9 +296,10 @@ if __name__ == "__main__":
         print(">>> ", train_dataset[i])
     
     # build tokenizer
-    aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-    foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/foldseek.txt")
-    ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/ss8.txt")
+    if "esm2" in args.plm_model:
+        aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
+        foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/foldseek.txt")
+        ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/ss8.txt")
     
     def collate_fn(examples):
         aa_seq, foldseek_seq, ss8_seq, label = [], [], [], []
@@ -310,6 +334,12 @@ if __name__ == "__main__":
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
     metrics = Accuracy(task="multiclass", num_classes=args.num_labels).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    if args.loss_fn == "cross_entropy":
+        loss_fn = nn.CrossEntropyLoss()
+    elif args.loss_fn == "focal_loss":
+        train_labels = [e["label"] for e in train_dataset]
+        alpha = [1.0 - (train_labels.count(i) / len(train_labels)) for i in range(args.num_labels)]
+        loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
     
     train_loader = DataLoader(
         train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
@@ -329,7 +359,7 @@ if __name__ == "__main__":
     )
     
     print("---------- Start Training ----------")
-    train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, optimizer, device)
+    train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, loss_fn, optimizer, device)
     
     if args.wandb:
         wandb.finish()

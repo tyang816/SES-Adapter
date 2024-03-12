@@ -163,3 +163,4 @@ cython_debug/
 /ckpt
 /wandb
 /log
+/dataset/*.ipynb
