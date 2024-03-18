@@ -7,6 +7,7 @@ sys.path.append(os.getcwd())
 import wandb
 import random
 import json
+import re
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -15,7 +16,7 @@ from torchmetrics.classification import Accuracy
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
-from transformers import EsmTokenizer, EsmModel
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5Model
 from src.utils.data_utils import BatchSampler
 from src.models.locseek import LocSeekModel
 
@@ -250,16 +251,27 @@ if __name__ == "__main__":
     # load protein language model
     set_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
-    for param in plm_model.parameters():
-        param.requires_grad = False
-    if args.hidden_size is None:
-        if "esm2" in args.plm_model:
-            args.hidden_size = plm_model.config.hidden_size
-        elif "prot_t5" in args.plm_model:
-            args.hidden_size = plm_model.config.d_model
-        else:
-            raise ValueError("hidden_size is not provided")
+    
+    # build tokenizer
+    if "esm" in args.plm_model:
+        aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
+        foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/foldseek.txt")
+        ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/ss8.txt")
+        plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
+    elif "bert" in args.plm_model:
+        aa_tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        foldseek_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/foldseek.txt", do_lower_case=False)
+        ss8_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/ss8.txt", do_lower_case=False)
+        plm_model = BertModel.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
+    elif "prot_t5" in args.plm_model:
+        aa_tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        foldseek_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/foldseek.txt", do_lower_case=False)
+        ss8_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/ss8.txt", do_lower_case=False)
+        plm_model = T5Model.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.d_model
+    
     
     # load locseek model
     model = LocSeekModel(args)
@@ -280,7 +292,10 @@ if __name__ == "__main__":
         for l in open(file):
             data = json.loads(l)
             dataset.append(data)
-            token_num.append(len(data["aa_seq"]))
+            if args.max_seq_len is not None:
+                token_num.append(min(len(data["aa_seq"]), args.max_seq_len))
+            else:
+                token_num.append(len(data["aa_seq"]))
         return dataset, token_num
 
     train_dataset, train_token_num = load_dataset(args.train_file)
@@ -295,39 +310,40 @@ if __name__ == "__main__":
     for i in random.sample(range(len(train_dataset)), 2):
         print(">>> ", train_dataset[i])
     
-    # build tokenizer
-    if "esm2" in args.plm_model:
-        aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/foldseek.txt")
-        ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/ss8.txt")
-    
     def collate_fn(examples):
-        aa_seq, foldseek_seq, ss8_seq, label = [], [], [], []
+        aa_seqs, foldseek_seqs, ss8_seqs, labels = [], [], [], []
         for e in examples:
-            if args.max_seq_len is not None:
-                aa_seq.append(e["aa_seq"][:args.max_seq_len])
-                foldseek_seq.append(e["foldseek_seq"][:args.max_seq_len])
-                ss8_seq.append(e["ss8_seq"][:args.max_seq_len])
-            else:
-                aa_seq.append(e["aa_seq"])
-                foldseek_seq.append(e["foldseek_seq"])
-                ss8_seq.append(e["ss8_seq"])
+            aa_seq, foldseek_seq, ss8_seq = e["aa_seq"], e["foldseek_seq"], e["ss8_seq"]
             
-            label.append(e["label"])
+            if args.max_seq_len is not None:
+                aa_seq = e["aa_seq"][:args.max_seq_len]
+                foldseek_seq = e["foldseek_seq"][:args.max_seq_len]
+                ss8_seq = e["ss8_seq"][:args.max_seq_len]
+            
+            if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
+                aa_seq = " ".join(list(aa_seq))
+                aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
+                foldseek_seq = " ".join(list(foldseek_seq))
+                ss8_seq = " ".join(list(ss8_seq))
+            
+            aa_seqs.append(aa_seq)
+            foldseek_seqs.append(foldseek_seq)
+            ss8_seqs.append(ss8_seq)
+            labels.append(e["label"])
         
-        aa_inputs = aa_tokenizer(aa_seq, return_tensors="pt", padding=True, truncation=True)
+        aa_inputs = aa_tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
         
-        foldseek_input_ids = foldseek_tokenizer(foldseek_seq, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-        ss8_input_ids = ss8_tokenizer(ss8_seq, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        foldseek_input_ids = foldseek_tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        ss8_input_ids = ss8_tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         return {
             "aa_input_ids": aa_input_ids, 
             "attention_mask": attention_mask, 
             "foldseek_input_ids": foldseek_input_ids, 
             "ss8_input_ids": ss8_input_ids,
-            "label": torch.as_tensor(label, dtype=torch.long)
+            "label": torch.as_tensor(labels, dtype=torch.long)
             }
         
     # metrics, optimizer, dataloader

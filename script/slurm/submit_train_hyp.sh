@@ -46,7 +46,7 @@ do
     done
 done
 
-for i in {3268..3302}
+for i in {3456..3464}
 do
     scancel $i
 done

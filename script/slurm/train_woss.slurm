@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/bin/bash -l
 #SBATCH -J locseek
 #SBATCH -p NvidiaA800
 #SBATCH --nodelist=ZSGPU18
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1 
 #SBATCH --cpus-per-task=16
+#SBATCH --mem=100G
 #SBATCH --time=180-00:00:00
 #SBATCH --output=/public/home/tanyang/workspace/LocSeek/log/%j.out
 #SBATCH --error=/public/home/tanyang/workspace/LocSeek/log/%j.err
@@ -16,28 +17,30 @@ cd /public/home/tanyang/clash-for-linux-backup-main
 bash start.sh
 proxy_on
 cd /public/home/tanyang/workspace/LocSeek
+export NCCL_IB_DISABLE=0
+export NCCL_DEBUG=INFO
+export OMP_PROC_BIND=false
 
-
-CUDA_VISIBLE_DEVICES=0 python train.py \
-    --plm_model ckpt/esm2_t33_650M_UR50D \
+python train.py \
+    --plm_model ckpt/esm2_t30_150M_UR50D \
     --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
-    --pooling_dropout 0.25 \
+    --pooling_dropout 0.1 \
     --train_file dataset/$dataset_type/ef"_train.json" \
     --val_file dataset/$dataset_type/ef"_val.json" \
     --test_file dataset/$dataset_type/ef"_test.json" \
-    --lr 5e-5 \
+    --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
-    --max_train_epochs 50 \
+    --max_train_epochs 10 \
     --max_batch_token 100000 \
-    --patience 10 \
+    --patience 3 \
     --use_foldseek \
-    --monitor val_loss \
+    --monitor val_acc \
     --ckpt_root ckpt \
-    --ckpt_dir val_loss/$dataset_type \
-    --model_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-5.pt \
+    --ckpt_dir val_acc/esm2_t30_150M_UR50D/$dataset_type \
+    --model_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-5
+    --wandb_run_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-4

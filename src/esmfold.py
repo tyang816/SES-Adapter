@@ -80,7 +80,7 @@ if __name__ == '__main__':
     model = EsmForProteinFolding.from_pretrained("facebook/esmfold_v1", low_cpu_mem_usage=True)
 
     model = model.cuda()
-    model.esm = model.esm.half()
+    # model.esm = model.esm.half()
     torch.backends.cuda.matmul.allow_tf32 = True
     # Optionally, uncomment to set a chunk size for axial attention. This can help reduce memory.
     # Lower sizes will have lower memory requirements at the cost of increased speed.
