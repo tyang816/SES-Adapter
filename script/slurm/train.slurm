@@ -23,7 +23,7 @@ export NCCL_DEBUG=INFO
 export OMP_PROC_BIND=false
 
 python train.py \
-    --plm_model ckpt/esm2_t30_150M_UR50D \
+    --plm_model ckpt/$plm_model \
     --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
@@ -35,13 +35,14 @@ python train.py \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
+    --max_seq_len 1022 \
     --max_batch_token 100000 \
     --patience 3 \
     --use_foldseek \
     --use_ss8 \
     --monitor val_acc \
     --ckpt_root ckpt \
-    --ckpt_dir val_acc/esm2_t30_150M_UR50D/$dataset_type \
+    --ckpt_dir val_acc/$plm_model/$dataset_type \
     --model_name "$dataset_type"_"ef"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project LocSeek \

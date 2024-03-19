@@ -3,7 +3,7 @@ dataset_type=deeploc-1_multi
 num_labels=10
 pdb_type=ef
 pooling_head=mean
-plm_model_name=prot_bert
+plm_model_name=esm1b_t33_650M_UR50S
 CUDA_VISIBLE_DEVICES=0 python train.py \
     --plm_model ckpt/$plm_model_name \
     --num_labels $num_labels \
@@ -17,6 +17,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
+    --max_seq_len 1022 \
     --max_batch_token 100000 \
     --patience 3 \
     --use_foldseek \
