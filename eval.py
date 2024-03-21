@@ -19,9 +19,6 @@ warnings.filterwarnings("ignore")
 def evaluate(model, plm_model, metrics, dataloader, loss_fn, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
-    metrics_result_dict = {}
-    for k in metrics:
-        metrics_result_dict[k] = 0
     
     for batch in epoch_iterator:
         for k, v in batch.items():
@@ -31,14 +28,14 @@ def evaluate(model, plm_model, metrics, dataloader, loss_fn, device=None):
         loss = loss_fn(logits, label)
         total_loss += loss.item() * len(label)
         for k, v in metrics.items():
-            metrics_result_dict[k] += v(logits, label).item() * len(label)
+            metrics[k].update(logits, label)
         epoch_iterator.set_postfix(eval_loss=loss.item())
     
     epoch_loss = total_loss / len(dataloader.dataset)
-    for k in metrics_result_dict:
-        metrics_result_dict[k] /= len(dataloader.dataset)
-        print(f"{k}: {metrics_result_dict[k]}")
-    return epoch_loss, metrics_result_dict
+    for k, v in metrics.items():
+        metrics[k] = v.compute()
+        print(f"{k}: {metrics[k]}")
+    return epoch_loss, metrics
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -120,10 +117,9 @@ if __name__ == '__main__':
                 foldseek_seq = " ".join(list(foldseek_seq))
                 ss8_seq = " ".join(list(ss8_seq))
             
-            aa_seqs.append(e["aa_seq"])
-            foldseek_seqs.append(e["foldseek_seq"])
-            ss8_seqs.append(e["ss8_seq"])
-            
+            aa_seqs.append(aa_seq)
+            foldseek_seqs.append(foldseek_seq)
+            ss8_seqs.append(ss8_seq)
             labels.append(e["label"])
         
         aa_inputs = aa_tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
@@ -142,14 +138,13 @@ if __name__ == '__main__':
             }
         
     loss_fn = nn.CrossEntropyLoss()
-    metrics = {
-        "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device),
-        "mcc": MulticlassMatthewsCorrCoef(num_classes=args.num_labels).to(device),
-        "f1": F1Score(task="multiclass", num_classes=args.num_labels).to(device),
-        "recall": Recall(task="multiclass", average='macro', num_classes=args.num_labels).to(device)
-    }
+    accuary = Accuracy(task="multiclass", num_classes=args.num_labels, average=None).to(device)
+    f1 = F1Score(task="multiclass", num_classes=args.num_labels, average=None).to(device)
+    recall = Recall(task="multiclass", num_classes=args.num_labels, average=None).to(device)
+    mcc = MulticlassMatthewsCorrCoef(num_classes=args.num_labels).to(device)
+    metrics = {"accuary": accuary, "f1": f1, "recall": recall, "mcc": mcc}
+    
     # process dataset
-
     def load_dataset(file):
         dataset, token_num = [], []
         for l in open(file):

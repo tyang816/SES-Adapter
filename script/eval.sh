@@ -1,10 +1,10 @@
 # dataset: deeploc-1_binary deeploc-1_multi deepsol
-dataset_type=deeploc-1_multi
-num_labels=10
+dataset_type=deeploc-1_binary
+num_labels=2
 pdb_type=ef
 pooling_head=mean
 plm_model=esm2_t33_650M_UR50D
-CUDA_VISIBLE_DEVICES=1 python eval.py \
+CUDA_VISIBLE_DEVICES=0 python eval.py \
     --plm_model ckpt/$plm_model \
     --num_labels $num_labels \
     --num_attention_heads 8 \
