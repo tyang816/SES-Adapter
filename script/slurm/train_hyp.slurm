@@ -15,6 +15,9 @@ cd /public/home/tanyang/clash-for-linux-backup-main
 bash start.sh
 proxy_on
 cd /public/home/tanyang/workspace/LocSeek
+export NCCL_IB_DISABLE=0
+export NCCL_DEBUG=INFO
+export OMP_PROC_BIND=false
 
 
 CUDA_VISIBLE_DEVICES=0 python train.py \

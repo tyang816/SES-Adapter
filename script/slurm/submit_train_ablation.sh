@@ -42,7 +42,7 @@ done
 # ablation for without foldseek with different plm_model
 for plm_model in esm2_t33_650M_UR50D
 do
-    for pooling_method in light_attention
+    for pooling_method in mean
     do
         sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofs.slurm
         #sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deepsol_"$pooling_method"_ef script/slurm/train_wofs.slurm
@@ -53,7 +53,7 @@ done
 # ablation for without ss8 with different plm_model
 for plm_model in esm2_t33_650M_UR50D
 do
-    for pooling_method in light_attention
+    for pooling_method in mean
     do
         sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_woss.slurm
         #sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deepsol_"$pooling_method"_ef script/slurm/train_wofs.slurm
@@ -64,7 +64,7 @@ done
 # ablation for without foldseek and ss8 with different plm_model
 for plm_model in esm2_t33_650M_UR50D
 do
-    for pooling_method in light_attention
+    for pooling_method in mean
     do
         sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofsss.slurm
         #sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deepsol_"$pooling_method"_ef script/slurm/train_wofsss.slurm
@@ -75,7 +75,7 @@ done
 # ablation for use foldseek and ss8 with different plm_model
 for plm_model in esm2_t33_650M_UR50D
 do
-    for pooling_method in light_attention
+    for pooling_method in mean
     do
         sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train.slurm
         #sbatch --export=dataset_type=deepsol,pooling_method=$pooling_method,plm_model=$plm_model,num_labels=2 --job-name=deepsol_"$pooling_method"_ef script/slurm/train.slurm
@@ -92,4 +92,17 @@ do
     sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofsss.slurm
     sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_wofs.slurm
     sbatch --export=dataset_type=deeploc-1_binary,pooling_method=$pooling_method,num_labels=2 --job-name=deeploc-1_binary_"$pooling_method"_ef script/slurm/train_woss.slurm
+done
+
+############################################################################################################
+
+# ablation for head number and pooling dropout
+for head_num in 2 4 8 16 32
+do
+    for pooling_dropout in 0 0.1 0.25 0.5
+    do
+        sbatch --export=dataset_type=deeploc-1_binary,num_labels=2,num_heads=$head_num,pooling_dropout=$pooling_dropout --job-name=deeploc-1_binary_attention1d_"$head_num"_"$pooling_dropout"_ef script/slurm/train_head.slurm
+        sbatch --export=dataset_type=deeploc-1_multi,num_labels=10,num_heads=$head_num,pooling_dropout=$pooling_dropout --job-name=deeploc-1_multi_attention1d_"$head_num"_"$pooling_dropout"_ef script/slurm/train_head.slurm
+        sbatch --export=dataset_type=deepsol,num_labels=2,num_heads=$head_num,pooling_dropout=$pooling_dropout --job-name=deepsol_attention1d_"$head_num"_"$pooling_dropout"_ef script/slurm/train_head.slurm
+    done
 done

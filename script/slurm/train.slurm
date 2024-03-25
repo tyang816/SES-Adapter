@@ -42,7 +42,7 @@ python train.py \
     --monitor val_acc \
     --ckpt_root ckpt \
     --ckpt_dir val_acc/$dataset_type \
-    --model_name "$dataset_type"_"af"_"$pooling_method"_5e-4.pt \
+    --model_name wor_"$dataset_type"_"af"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_"af"_"$pooling_method"_5e-4
+    --wandb_run_name wor_"$dataset_type"_"af"_"$pooling_method"_5e-4

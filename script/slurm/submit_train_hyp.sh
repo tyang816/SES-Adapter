@@ -14,7 +14,7 @@ sbatch --export=dataset_type=$dataset_type,pooling_method=$pooling_method,num_la
 
 
 # tune hyperparameters for deeploc-1_binary
-for pooling_method in attention1d mean light_attention
+for pooling_method in attention1d
 do
     for pdb_type in ef af
     do
@@ -26,11 +26,11 @@ do
 done
 
 # tune hyperparameters for deeploc-1_multi
-for pooling_method in attention1d mean light_attention
+for pooling_method in mean
 do
-    for pdb_type in ef af
+    for pdb_type in ef
     do
-        for lr in 1e-3 1e-4
+        for lr in 1e-3 5e-4 1e-4
         do
             sbatch --export=dataset_type=deeploc-1_multi,pooling_method=$pooling_method,num_labels=10,lr=$lr,pdb_type=$pdb_type --job-name=deeploc-1_multi_"$pooling_method"_"$pdb_type" script/slurm/train_hyp.slurm
         done
@@ -46,7 +46,7 @@ do
     done
 done
 
-for i in {3456..3464}
+for i in {4120..4179}
 do
     scancel $i
 done

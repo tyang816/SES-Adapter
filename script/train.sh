@@ -3,8 +3,8 @@ dataset_type=deeploc-1_multi
 num_labels=10
 pdb_type=ef
 pooling_head=mean
-plm_model_name=esm1b_t33_650M_UR50S
-CUDA_VISIBLE_DEVICES=0 python train.py \
+plm_model_name=esm2_t33_650M_UR50D
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --plm_model ckpt/$plm_model_name \
     --num_labels $num_labels \
     --num_attention_heads 8 \
@@ -13,13 +13,13 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --train_file dataset/$dataset_type/$pdb_type"_train.json" \
     --val_file dataset/$dataset_type/$pdb_type"_val.json" \
     --test_file dataset/$dataset_type/$pdb_type"_test.json" \
-    --lr 1e-3 \
+    --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
-    --max_seq_len 1022 \
     --max_batch_token 100000 \
     --patience 3 \
+    --loss_fn focal_loss \
     --use_foldseek \
     --use_ss8 \
     --monitor val_acc \
