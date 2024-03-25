@@ -35,7 +35,7 @@ python train.py \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
-    --max_batch_token 100000 \
+    --max_batch_token 50000 \
     --patience 3 \
     --use_foldseek \
     --use_ss8 \

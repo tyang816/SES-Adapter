@@ -118,10 +118,12 @@ class LocSeekModel(nn.Module):
         self.config = config
         
         if config.use_foldseek:
-            self.foldseek_embedding = nn.Embedding(28, config.hidden_size)
+            #28
+            self.foldseek_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
             self.cross_attention_foldseek = CrossModalAttention(config)
         if config.use_ss8:
-            self.ss_embedding = nn.Embedding(16, config.hidden_size)
+            #16
+            self.ss_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
             self.cross_attention_ss = CrossModalAttention(config)
         
         self.layer_norm = nn.LayerNorm(config.hidden_size)
@@ -137,7 +139,7 @@ class LocSeekModel(nn.Module):
     
     @torch.no_grad()
     def plm_embedding(self, plm_model, aa_seq, attention_mask):
-        outputs = plm_model(aa_seq, attention_mask=attention_mask)
+        outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()

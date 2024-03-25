@@ -109,10 +109,11 @@ if __name__ == '__main__':
                 continue
             tokenized_input = tokenizer([sequence], return_tensors="pt", add_special_tokens=False)['input_ids'].cuda()
             # Multimer prediction can be done with chains separated by ':'
-
-            with torch.no_grad():
-                output = model(tokenized_input)
-
+            try:
+                with torch.no_grad():
+                    output = model(tokenized_input)
+            except:
+                continue
             gc.collect()
             
             

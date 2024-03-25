@@ -16,7 +16,7 @@ from torchmetrics.classification import Accuracy
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5Model
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5EncoderModel
 from src.utils.data_utils import BatchSampler
 from src.models.locseek import LocSeekModel
 
@@ -254,24 +254,19 @@ if __name__ == "__main__":
     
     # build tokenizer
     if "esm" in args.plm_model:
-        aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/foldseek.txt")
-        ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/ss8.txt")
+        tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
         plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
     elif "bert" in args.plm_model:
-        aa_tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        foldseek_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/foldseek.txt", do_lower_case=False)
-        ss8_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/ss8.txt", do_lower_case=False)
+        tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = BertModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
     elif "prot_t5" in args.plm_model:
-        aa_tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        foldseek_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/foldseek.txt", do_lower_case=False)
-        ss8_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/ss8.txt", do_lower_case=False)
-        plm_model = T5Model.from_pretrained(args.plm_model).to(device).eval()
+        tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
+    args.vocab_size = plm_model.config.vocab_size
     
     # load locseek model
     model = LocSeekModel(args)
@@ -331,12 +326,12 @@ if __name__ == "__main__":
             ss8_seqs.append(ss8_seq)
             labels.append(e["label"])
         
-        aa_inputs = aa_tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
+        aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
         
-        foldseek_input_ids = foldseek_tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-        ss8_input_ids = ss8_tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         return {
             "aa_input_ids": aa_input_ids, 

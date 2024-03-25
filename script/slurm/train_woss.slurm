@@ -27,20 +27,20 @@ python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.1 \
-    --train_file dataset/$dataset_type/af"_train.json" \
-    --val_file dataset/$dataset_type/af"_val.json" \
-    --test_file dataset/$dataset_type/af"_test.json" \
+    --train_file dataset/$dataset_type/ef"_train.json" \
+    --val_file dataset/$dataset_type/ef"_val.json" \
+    --test_file dataset/$dataset_type/ef"_test.json" \
     --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
-    --max_batch_token 100000 \
+    --max_batch_token 50000 \
     --patience 3 \
     --use_foldseek \
     --monitor val_acc \
     --ckpt_root ckpt \
-    --ckpt_dir val_acc/$dataset_type \
-    --model_name wossr_"$dataset_type"_"af"_"$pooling_method"_5e-4.pt \
+    --ckpt_dir val_acc/$plm_model/$dataset_type \
+    --model_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name wossr_"$dataset_type"_"af"_"$pooling_method"_5e-4
+    --wandb_run_name woss_"$dataset_type"_"ef"_"$pooling_method"_5e-4

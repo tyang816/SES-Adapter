@@ -3,9 +3,9 @@ dataset_type=deeploc-1_multi
 num_labels=10
 pdb_type=ef
 pooling_head=mean
-plm_model_name=esm2_t33_650M_UR50D
+plm_model=prot_t5_xl_uniref50
 CUDA_VISIBLE_DEVICES=1 python train.py \
-    --plm_model ckpt/$plm_model_name \
+    --plm_model ckpt/$plm_model \
     --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
@@ -17,14 +17,14 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
     --max_train_epochs 10 \
-    --max_batch_token 100000 \
+    --max_batch_token 50000 \
     --patience 3 \
-    --loss_fn focal_loss \
     --use_foldseek \
     --use_ss8 \
     --monitor val_acc \
     --ckpt_root ckpt \
     --ckpt_dir debug/$plm_model_name/$dataset_type \
-    --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_debug.pt \
+    --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_"$plm_model"_debug.pt \
+    --wandb \
     --wandb_project LocSeek_debug \
-    --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_head"
+    --wandb_run_name "$dataset_type"_"$pdb_type"_"$pooling_head"_"$plm_model"
