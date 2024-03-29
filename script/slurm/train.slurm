@@ -24,13 +24,12 @@ export OMP_PROC_BIND=false
 
 python train.py \
     --plm_model ckpt/$plm_model \
-    --num_labels $num_labels \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.1 \
-    --train_file dataset/$dataset_type/ef"_train.json" \
-    --val_file dataset/$dataset_type/ef"_val.json" \
-    --test_file dataset/$dataset_type/ef"_test.json" \
+    --train_file dataset/$dataset/$pdb_type"_train.json" \
+    --val_file dataset/$dataset/$pdb_type"_val.json" \
+    --test_file dataset/$dataset/$pdb_type"_test.json" \
     --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
@@ -41,8 +40,8 @@ python train.py \
     --use_ss8 \
     --monitor val_acc \
     --ckpt_root ckpt \
-    --ckpt_dir val_acc/$plm_model/$dataset_type \
-    --model_name "$dataset_type"_"ef"_"$pooling_method"_5e-4.pt \
+    --ckpt_dir val_acc/$plm_model/$dataset \
+    --model_name "$dataset"_"$pdb_type"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_"ef"_"$pooling_method"_5e-4
+    --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_method"_5e-4

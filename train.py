@@ -28,6 +28,10 @@ dataset_to_label = {
     "MetalIonBinding": 2, "deeploc-1_multi": 10, "deepsol": 2,
     "deeploc-1_binary": 2
 }
+dataset_to_metrics = {
+    "MetalIonBinding": "f1", "deeploc-1_multi": "f1", "deepsol": "f1",
+    "deeploc-1_binary": "acc"
+}
 
 class MultiClassFocalLossWithAlpha(nn.Module):
     def __init__(self, num_classes, alpha=None, gamma=1, reduction='mean', device="cuda"):

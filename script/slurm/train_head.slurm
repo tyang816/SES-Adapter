@@ -24,13 +24,12 @@ export OMP_PROC_BIND=false
 
 python train.py \
     --plm_model ckpt/esm2_t33_650M_UR50D \
-    --num_labels $num_labels \
     --num_attention_heads $num_heads \
     --pooling_method mean \
     --pooling_dropout $pooling_dropout \
-    --train_file dataset/$dataset_type/ef"_train.json" \
-    --val_file dataset/$dataset_type/ef"_val.json" \
-    --test_file dataset/$dataset_type/ef"_test.json" \
+    --train_file dataset/$dataset/$pdb_type"_train.json" \
+    --val_file dataset/$dataset/$pdb_type"_val.json" \
+    --test_file dataset/$dataset/$pdb_type"_test.json" \
     --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 4 \
@@ -41,8 +40,8 @@ python train.py \
     --use_ss8 \
     --monitor val_acc \
     --ckpt_root ckpt \
-    --ckpt_dir val_acc/$dataset_type \
-    --model_name "$dataset_type"_"ef"_5e-4_"$num_heads"_"$pooling_dropout".pt \
+    --ckpt_dir val_acc/$dataset \
+    --model_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout".pt \
     --wandb \
     --wandb_project LocSeek \
-    --wandb_run_name "$dataset_type"_"ef"_5e-4_"$num_heads"_"$pooling_dropout"
+    --wandb_run_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout"
