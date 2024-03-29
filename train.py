@@ -24,8 +24,13 @@ from src.models.locseek import LocSeekModel
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
+dataset_to_label = {
+    "MetalIonBinding": 2, "deeploc-1_multi": 10, "deepsol": 2,
+    "deeploc-1_binary": 2
+}
+
 class MultiClassFocalLossWithAlpha(nn.Module):
-    def __init__(self, num_classes, alpha=None, gamma=2, reduction='mean', device="cuda"):
+    def __init__(self, num_classes, alpha=None, gamma=1, reduction='mean', device="cuda"):
         super(MultiClassFocalLossWithAlpha, self).__init__()
         if alpha is None:
             self.alpha = torch.ones(num_classes, dtype=torch.float32)
@@ -190,7 +195,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
-    parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
+    parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
@@ -267,6 +272,8 @@ if __name__ == "__main__":
         args.hidden_size = plm_model.config.d_model
     
     args.vocab_size = plm_model.config.vocab_size
+    if args.num_labels is None:
+        args.num_labels = dataset_to_label[args.train_file.split("/")[1]]
     
     # load locseek model
     model = LocSeekModel(args)
@@ -349,7 +356,8 @@ if __name__ == "__main__":
         loss_fn = nn.CrossEntropyLoss()
     elif args.loss_fn == "focal_loss":
         train_labels = [e["label"] for e in train_dataset]
-        alpha = [1.0 - (train_labels.count(i) / len(train_labels)) for i in range(args.num_labels)]
+        alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_labels)]
+        print(">>> alpha: ", alpha)
         loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
     
     train_loader = DataLoader(

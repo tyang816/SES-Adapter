@@ -101,27 +101,27 @@ if __name__ == '__main__':
         bar = tqdm(zip(names, sequences))
         for name, sequence in bar:
             bar.set_description(name)
-            out_file = os.path.join(args.out_dir, f"{name[1:]}.ef.pdb")
+            name = name[1:].split(" ")[0]
+            out_file = os.path.join(args.out_dir, f"{name}.ef.pdb")
             if os.path.exists(out_file):
-                out_info_dict["name"].append(name[1:])
+                out_info_dict["name"].append(name)
                 struct = bsio.load_structure(out_file, extra_fields=["b_factor"])
                 out_info_dict["plddt"].append(struct.b_factor.mean())
                 continue
-            tokenized_input = tokenizer([sequence], return_tensors="pt", add_special_tokens=False)['input_ids'].cuda()
+            
             # Multimer prediction can be done with chains separated by ':'
             try:
+                tokenized_input = tokenizer([sequence], return_tensors="pt", add_special_tokens=False)['input_ids'].cuda()
                 with torch.no_grad():
                     output = model(tokenized_input)
             except:
                 continue
             gc.collect()
-            
-            
             pdb = convert_outputs_to_pdb(output)
             with open(out_file, "w") as f:
                 f.write("\n".join(pdb))
                 
-            out_info_dict["name"].append(name[1:])
+            out_info_dict["name"].append(name)
             struct = bsio.load_structure(out_file, extra_fields=["b_factor"])
             out_info_dict["plddt"].append(struct.b_factor.mean())
         
