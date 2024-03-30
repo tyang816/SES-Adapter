@@ -16,7 +16,7 @@ from torchmetrics.classification import Accuracy
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5EncoderModel
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
 from src.models.locseek import LocSeekModel
 
@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore")
 
 dataset_to_label = {
     "MetalIonBinding": 2, "deeploc-1_multi": 10, "deepsol": 2,
-    "deeploc-1_binary": 2
+    "deeploc-1_binary": 2, "DeepSoluE": 2
 }
 dataset_to_metrics = {
     "MetalIonBinding": "f1", "deeploc-1_multi": "f1", "deepsol": "f1",
@@ -274,6 +274,10 @@ if __name__ == "__main__":
         tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
+    elif "ankh" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.d_model
     
     args.vocab_size = plm_model.config.vocab_size
     if args.num_labels is None:
@@ -331,18 +335,26 @@ if __name__ == "__main__":
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
                 foldseek_seq = " ".join(list(foldseek_seq))
                 ss8_seq = " ".join(list(ss8_seq))
+            elif 'ankh' in args.plm_model:
+                aa_seq = list(aa_seq)
+                foldseek_seq = list(foldseek_seq)
+                ss8_seq = list(ss8_seq)
             
             aa_seqs.append(aa_seq)
             foldseek_seqs.append(foldseek_seq)
             ss8_seqs.append(ss8_seq)
             labels.append(e["label"])
         
-        aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
+        if 'ankh' in args.plm_model:
+            aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
+            foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+            ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+        else:
+            aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
+            foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+            ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
-        
-        foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-        ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         return {
             "aa_input_ids": aa_input_ids, 

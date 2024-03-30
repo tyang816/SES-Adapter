@@ -1,11 +1,11 @@
 # dataset: deeploc-1_binary deeploc-1_multi deepsol deepsolue
 # plm_model: prot_t5_xl_uniref50 esm2_t33_650M_UR50D
 dataset=MetalIonBinding
-pdb_type=ef
+pdb_type=af
 pooling_head=mean
-plm_model=prot_t5_xl_uniref50
+plm_model=ankh-large
 lr=5e-4
-CUDA_VISIBLE_DEVICES=0 python train.py \
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
