@@ -8,21 +8,19 @@ sbatch --export=dataset=DeepLocMulti,pooling_method=attention1d --job-name=deepl
 # dataset (esmfold only): DeepSol DeepSoluE
 # plm_model (Facebook): esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
 # plm_model (RostLab): prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
-for dataset in DeepSol DeepSoluE
+for dataset in DeepLocBinary DeepLocMulti MetalIonBinding
 do
-    for plm_model in esm2_t36_3B_UR50D ankh-base ankh-large
+    for pdb_type in ef af
     do
-        for pooling_method in mean
+        for plm_model in esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
         do
-            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_wofs.slurm
-            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_woss.slurm
-            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train.slurm
-            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_wofsss.slurm
-
-            # sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train_wofs.slurm
-            # sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train_woss.slurm
-            # sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train.slurm
-            # sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train_wofsss.slurm
+            for pooling_method in mean
+            do
+                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_wofs.slurm
+                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_woss.slurm
+                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train.slurm
+                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_wofsss.slurm
+            done
         done
     done
 done

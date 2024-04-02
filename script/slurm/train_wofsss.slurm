@@ -35,4 +35,4 @@ python train.py \
     --model_name wofsss_"$pdb_type"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project adapter \
-    --wandb_run_name wofsss_"$pdb_type"_"$pooling_method"_5e-4
+    --wandb_run_name wofsss_"$plm_model"_"$pdb_type"_"$pooling_method"_5e-4

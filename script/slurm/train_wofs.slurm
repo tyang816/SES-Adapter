@@ -26,7 +26,7 @@ python train.py \
     --pdb_type $pdb_type \
     --lr 5e-4 \
     --num_workers 4 \
-    --gradient_accumulation_steps 3 \
+    --gradient_accumulation_steps 1 \
     --max_train_epochs 15 \
     --max_batch_token 50000 \
     --patience 5 \
@@ -36,4 +36,4 @@ python train.py \
     --model_name wofs_"$pdb_type"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project adapter \
-    --wandb_run_name wofs_"$pdb_type"_"$pooling_method"_5e-4
+    --wandb_run_name wofs_"$plm_model"_"$pdb_type"_"$pooling_method"_5e-4

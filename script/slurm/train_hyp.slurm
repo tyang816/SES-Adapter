@@ -11,9 +11,6 @@
 
 source ~/.bashrc
 conda activate protssn
-cd /public/home/tanyang/clash-for-linux-backup-main
-bash start.sh
-proxy_on
 cd /public/home/tanyang/workspace/LocSeek
 export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=INFO
@@ -25,18 +22,17 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.25 \
-    --train_file dataset/$dataset/$pdb_type"_train.json" \
-    --val_file dataset/$dataset/$pdb_type"_val.json" \
-    --test_file dataset/$dataset/$pdb_type"_test.json" \
+    --dataset $dataset \
+    --pdb_type $pdb_type \
     --lr $lr \
     --num_workers 4 \
     --batch_size 64 \
     --max_train_epochs 50 \
     --max_seq_len 2048 \
     --patience 5 \
-    --ckpt_root ckpt \
+    --ckpt_root result \
     --ckpt_dir $dataset \
     --model_name "$dataset"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
-    --wandb_project LocSeek_debug \
+    --wandb_project adapter_debug \
     --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_method"_"$lr"

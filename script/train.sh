@@ -24,7 +24,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --use_ss8 \
     --ckpt_root result \
     --ckpt_dir adapter_debug/$plm_model/$dataset \
-    --model_name "$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"_debug.pt \
+    --model_name "$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
     --wandb \
     --wandb_project adapter_debug \
     --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"

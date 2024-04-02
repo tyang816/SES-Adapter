@@ -27,21 +27,19 @@ python train.py \
     --num_attention_heads $num_heads \
     --pooling_method mean \
     --pooling_dropout $pooling_dropout \
-    --train_file dataset/$dataset/$pdb_type"_train.json" \
-    --val_file dataset/$dataset/$pdb_type"_val.json" \
-    --test_file dataset/$dataset/$pdb_type"_test.json" \
+    --dataset $dataset \
+    --pdb_type $pdb_type \
     --lr 5e-4 \
     --num_workers 4 \
-    --gradient_accumulation_steps 4 \
-    --max_train_epochs 10 \
+    --gradient_accumulation_steps 1 \
+    --max_train_epochs 15 \
     --max_batch_token 50000 \
-    --patience 3 \
+    --patience 5 \
     --use_foldseek \
     --use_ss8 \
-    --monitor val_acc \
-    --ckpt_root ckpt \
+    --ckpt_root result \
     --ckpt_dir val_acc/$dataset \
     --model_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout".pt \
     --wandb \
-    --wandb_project LocSeek \
+    --wandb_project adapter \
     --wandb_run_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout"

@@ -263,15 +263,15 @@ if __name__ == "__main__":
     
     args.vocab_size = plm_model.config.vocab_size
     if args.train_file is None:
-        args.train_file = f"data/{args.dataset}/{args.pdb_type}_train.json"
+        args.train_file = f"dataset/{args.dataset}/{args.pdb_type}_train.json"
     if args.val_file is None:
-        args.val_file = f"data/{args.dataset}/{args.pdb_type}_val.json"
+        args.val_file = f"dataset/{args.dataset}/{args.pdb_type}_val.json"
     if args.test_file is None:
-        args.test_file = f"data/{args.dataset}/{args.pdb_type}_test.json"
+        args.test_file = f"dataset/{args.dataset}/{args.pdb_type}_test.json"
     if args.num_labels is None:
         args.num_labels = DATASET_TO_NUM_LABELS[args.dataset]
     
-    # load locseek model
+    # load adapter model
     model = AdapterModel(args)
     model.to(device)
 

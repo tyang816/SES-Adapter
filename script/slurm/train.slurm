@@ -37,4 +37,4 @@ python train.py \
     --model_name "$pdb_type"_"$pooling_method"_5e-4.pt \
     --wandb \
     --wandb_project adapter \
-    --wandb_run_name "$pdb_type"_"$pooling_method"_5e-4
+    --wandb_run_name "$plm_model"_"$pdb_type"_"$pooling_method"_5e-4
