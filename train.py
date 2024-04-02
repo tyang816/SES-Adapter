@@ -55,6 +55,26 @@ DATASET_TO_MONITOR = {
     "MetalIonBinding": "accuracy",
     "Thermostability": "spearman_corr"
 }
+DATASET_TO_NORMALIZE = {
+    "DeepLocBinary": None,
+    "DeepLocMulti": None,
+    "DeepSol": None,
+    "DeepSoluE": None,
+    "MetalIonBinding": None,
+    "Thermostability": "min_max"
+}
+
+def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
+    labels = [e["label"] for e in train_dataset]
+    min_label, max_label = min(labels), max(labels)
+    for e in train_dataset:
+        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+    for e in val_dataset:
+        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+    for e in test_dataset:
+        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+    return train_dataset, val_dataset, test_dataset
+
 
 class MultiClassFocalLossWithAlpha(nn.Module):
     def __init__(self, num_classes, alpha=None, gamma=1, reduction='mean', device="cuda"):
@@ -299,6 +319,8 @@ if __name__ == "__main__":
     train_dataset, train_token_num = load_dataset(args.train_file)
     val_dataset, val_token_num = load_dataset(args.val_file)
     test_dataset, test_token_num = load_dataset(args.test_file)
+    if DATASET_TO_NORMALIZE[args.dataset] == "min_max":
+        train_dataset, val_dataset, test_dataset = min_max_normalize_dataset(train_dataset, val_dataset, test_dataset)
     
     print(">>> trainset: ", len(train_dataset))
     print(">>> valset: ", len(val_dataset))

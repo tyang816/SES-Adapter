@@ -2,8 +2,8 @@
 # dataset (esmfold only): DeepSol DeepSoluE
 # plm_model (Facebook): esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
 # plm_model (RostLab): prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
-dataset=DeepLocMulti
-pdb_type=ef
+dataset=Thermostability
+pdb_type=af
 pooling_head=mean
 plm_model=ankh-large
 lr=5e-4
