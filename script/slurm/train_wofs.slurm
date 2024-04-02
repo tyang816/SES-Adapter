@@ -10,12 +10,8 @@
 #SBATCH --output=/public/home/tanyang/workspace/LocSeek/log/%j.out
 #SBATCH --error=/public/home/tanyang/workspace/LocSeek/log/%j.err
 
-
 source ~/.bashrc
 conda activate protssn
-cd /public/home/tanyang/clash-for-linux-backup-main
-bash start.sh
-proxy_on
 cd /public/home/tanyang/workspace/LocSeek
 export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=INFO
@@ -26,20 +22,18 @@ python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.1 \
-    --train_file dataset/$dataset/$pdb_type"_train.json" \
-    --val_file dataset/$dataset/$pdb_type"_val.json" \
-    --test_file dataset/$dataset/$pdb_type"_test.json" \
+    --dataset $dataset \
+    --pdb_type $pdb_type \
     --lr 5e-4 \
     --num_workers 4 \
-    --gradient_accumulation_steps 4 \
-    --max_train_epochs 10 \
+    --gradient_accumulation_steps 3 \
+    --max_train_epochs 15 \
     --max_batch_token 50000 \
-    --patience 3 \
+    --patience 5 \
     --use_ss8 \
-    --monitor val_acc \
-    --ckpt_root ckpt \
-    --ckpt_dir val_acc/$plm_model/$dataset \
-    --model_name wofs_"$dataset"_"$pdb_type"_"$pooling_method"_5e-4.pt \
+    --ckpt_root result \
+    --ckpt_dir $plm_model/$dataset \
+    --model_name wofs_"$pdb_type"_"$pooling_method"_5e-4.pt \
     --wandb \
-    --wandb_project LocSeek \
-    --wandb_run_name wofs_"$dataset"_"$pdb_type"_"$pooling_method"_5e-4
+    --wandb_project adapter \
+    --wandb_run_name wofs_"$pdb_type"_"$pooling_method"_5e-4

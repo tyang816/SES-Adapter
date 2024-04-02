@@ -13,24 +13,47 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from transformers import logging
 from torchmetrics.classification import Accuracy
+from torchmetrics.regression import SpearmanCorrCoef
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
-from src.models.locseek import LocSeekModel
+from src.models.adapter import AdapterModel
 
 # ignore warning information
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
-dataset_to_label = {
-    "MetalIonBinding": 2, "deeploc-1_multi": 10, "deepsol": 2,
-    "deeploc-1_binary": 2, "DeepSoluE": 2
+DATASET_TO_NUM_LABELS = {
+    "DeepLocBinary": 2, "DeepLocMulti": 10, 
+    "DeepSol": 2, "DeepSoluE": 2,
+    "MetalIonBinding": 2, "Thermostability": 1
 }
-dataset_to_metrics = {
-    "MetalIonBinding": "f1", "deeploc-1_multi": "f1", "deepsol": "f1",
-    "deeploc-1_binary": "acc"
+DATASET_TO_TASK = {
+    "DeepLocBinary": "single_label_classification", 
+    "DeepLocMulti": "single_label_classification",
+    "DeepSol": "single_label_classification", 
+    "DeepSoluE": "single_label_classification",
+    "MetalIonBinding": "single_label_classification", 
+    "Thermostability": "regression",
+}
+# valid and test metrics
+DATASET_TO_METRICS = {
+    "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
+    "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=10)),
+    "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
+    "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
+    "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
+    "Thermostability": ("spearman_corr", SpearmanCorrCoef())
+}
+DATASET_TO_MONITOR = {
+    "DeepLocBinary": "accuracy",
+    "DeepLocMulti": "accuracy",
+    "DeepSol": "accuracy",
+    "DeepSoluE": "accuracy",
+    "MetalIonBinding": "accuracy",
+    "Thermostability": "spearman_corr"
 }
 
 class MultiClassFocalLossWithAlpha(nn.Module):
@@ -43,13 +66,13 @@ class MultiClassFocalLossWithAlpha(nn.Module):
         self.reduction = reduction
 
     def forward(self, pred, target):
-        alpha = self.alpha[target]  # 为当前batch内的样本，逐个分配类别权重，shape=(bs), 一维向量
-        log_softmax = torch.log_softmax(pred, dim=1) # 对模型裸输出做softmax再取log, shape=(bs, 3)
-        logpt = torch.gather(log_softmax, dim=1, index=target.view(-1, 1))  # 取出每个样本在类别标签位置的log_softmax值, shape=(bs, 1)
-        logpt = logpt.view(-1)  # 降维，shape=(bs)
-        ce_loss = -logpt  # 对log_softmax再取负，就是交叉熵了
-        pt = torch.exp(logpt)  #对log_softmax取exp，把log消了，就是每个样本在类别标签位置的softmax值了，shape=(bs)
-        focal_loss = alpha * (1 - pt) ** self.gamma * ce_loss  # 根据公式计算focal loss，得到每个样本的loss值，shape=(bs)
+        alpha = self.alpha[target]
+        log_softmax = torch.log_softmax(pred, dim=1)
+        logpt = torch.gather(log_softmax, dim=1, index=target.view(-1, 1))
+        logpt = logpt.view(-1)
+        ce_loss = -logpt
+        pt = torch.exp(logpt)
+        focal_loss = alpha * (1 - pt) ** self.gamma * ce_loss
         if self.reduction == "mean":
             return torch.mean(focal_loss)
         if self.reduction == "sum":
@@ -59,15 +82,17 @@ class MultiClassFocalLossWithAlpha(nn.Module):
 
 def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, 
           loss_fn, optimizer, device):
-    best_val_loss, best_val_acc = float("inf"), 0
-    val_loss_list, val_acc_list = [], []
+    best_val_loss, best_val_metric_score = float("inf"), -float("inf")
+    val_loss_list, val_metric_list = [], []
+    metric_name, metric = metrics
+    metric = metric.to(device)
     path = os.path.join(args.ckpt_dir, args.model_name)
     global_steps = 0
     for epoch in range(args.max_train_epochs):
         print(f"---------- Epoch {epoch} ----------")
         # train
         model.train()
-        epoch_train_loss, epoch_train_acc = 0, 0
+        epoch_train_loss = 0
         epoch_iterator = tqdm(train_loader)
         for batch in epoch_iterator:
             with accelerator.accumulate(model):
@@ -76,103 +101,62 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                 label = batch["label"]
                 logits = model(plm_model, batch)
                 loss = loss_fn(logits, label)
-                epoch_train_loss += loss.item() * len(label)
-                acc = metrics(logits, label).item()
-                epoch_train_acc += acc * len(label)
-                
+                epoch_train_loss += loss.item() * len(label)                
                 global_steps += 1
                 accelerator.backward(loss)
                 optimizer.step()
                 optimizer.zero_grad()
-                epoch_iterator.set_postfix(train_loss=loss.item(), train_acc=acc)
+                epoch_iterator.set_postfix(train_loss=loss.item())
                 if args.wandb:
-                    wandb.log({"train/train_loss": loss.item(), "train/train_acc": acc, "train/epoch": epoch}, step=global_steps)
-                
-                # eval every n steps
-                if global_steps % args.eval_every_n_steps == 0 and args.eval_every_n_steps > 0:
-                    model.eval()
-                    with torch.no_grad():
-                        val_loss, val_acc = eval_loop(model, plm_model, metrics, val_loader, loss_fn, device)
-                        val_acc_list.append(val_acc)
-                        val_loss_list.append(val_loss)
-                        if args.wandb:
-                            wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch}, step=global_steps)
-                    print(f'>>> Steps {global_steps} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
-                    model.train()
-                    
-                    # early stopping
-                    if args.monitor == "val_acc":
-                        if val_acc > best_val_acc:
-                            best_val_acc = val_acc
-                            torch.save(model.state_dict(), path)
-                            print(f'>>> BEST at steps {global_steps}, loss: {best_val_loss:.4f}, acc: {best_val_acc:.4f}')
-                            print(f'>>> Save model to {path}')
-                            
-                        if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
-                            print(f'>>> Early stopping at steps {global_steps}')
-                            break
-                    
-                    if args.monitor == "val_loss":
-                        if val_loss < best_val_loss:
-                            best_val_loss = val_loss
-                            torch.save(model.state_dict(), path)
-                            print(f'>>> BEST at steps {global_steps}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
-                            print(f'>>> Save model to {path}')
-                        
-                        if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
-                            print(f'>>> Early stopping at steps {global_steps}')
-                            break
+                    wandb.log({"train/loss": loss.item(), "train/epoch": epoch}, step=global_steps)
                     
         train_loss = epoch_train_loss / len(train_loader.dataset)
-        train_acc = epoch_train_acc / len(train_loader.dataset)
-        print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f} acc: {train_acc:.4f}')
+        print(f'EPOCH {epoch} TRAIN loss: {train_loss:.4f}')
         
         # eval every epoch
-        if args.eval_every_n_steps < 0:
-            model.eval()
-            with torch.no_grad():
-                val_loss, val_acc = eval_loop(model, plm_model, metrics, val_loader, loss_fn, device)
-                val_acc_list.append(val_acc)
-                val_loss_list.append(val_loss)
-                if args.wandb:
-                    wandb.log({"valid/val_loss": val_loss, "valid/val_acc": val_acc, "valid/epoch": epoch})
-            print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} acc: {val_acc:.4f}')
-        
-            # early stopping
-            if args.monitor == "val_acc":
-                if val_acc > best_val_acc:
-                    best_val_acc = val_acc
-                    torch.save(model.state_dict(), path)
-                    print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}, acc: {best_val_acc:.4f}')
-                    print(f'>>> Save model to {path}')
-                
-                if len(val_acc_list) - val_acc_list.index(max(val_acc_list)) > args.patience:
-                    print(f'>>> Early stopping at epoch {epoch}')
-                    break
+        model.eval()
+        with torch.no_grad():
+            val_loss, val_metric_score = eval_loop(model, plm_model, metric, val_loader, loss_fn, device)
+            val_metric_list.append(val_metric_score)
+            val_loss_list.append(val_loss)
+            if args.wandb:
+                wandb.log({"valid/loss": val_loss, f"valid/{metric_name}": val_metric_score, "valid/epoch": epoch})
+        print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} {metric_name}: {val_metric_score:.4f}')
+    
+        # early stopping
+        if args.monitor == "loss":
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                torch.save(model.state_dict(), path)
+                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, {metric_name}: {val_metric_score:.4f}')
+                print(f'>>> Save model to {path}')
             
-            if args.monitor == "val_loss":
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    torch.save(model.state_dict(), path)
-                    print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, acc: {val_acc:.4f}')
-                    print(f'>>> Save model to {path}')
-                
-                if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
-                    print(f'>>> Early stopping at epoch {epoch}')
-                    break
-        
+            if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
+                print(f'>>> Early stopping at epoch {epoch}')
+                break
+        else:
+            if val_metric_score > best_val_metric_score:
+                best_val_metric_score = val_metric_score
+                torch.save(model.state_dict(), path)
+                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}, {metric_name}: {best_val_metric_score:.4f}')
+                print(f'>>> Save model to {path}')
+            
+            if len(val_metric_list) - val_metric_list.index(max(val_metric_list)) > args.patience:
+                print(f'>>> Early stopping at epoch {epoch}')
+                break
+    
     print(f"TESTING: loading from {path}")
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_acc = eval_loop(model, plm_model, metrics, test_loader, loss_fn, device)
+        test_loss, test_metric_score = eval_loop(model, plm_model, metric, test_loader, loss_fn, device)
         if args.wandb:
-            wandb.log({"test/test_loss": test_loss, "test/test_acc": test_acc})
-    print(f'TEST loss: {test_loss:.4f} acc: {test_acc:.4f}')
+            wandb.log({"test/loss": test_loss, f"test/{metric_name}": test_metric_score})
+    print(f'TEST loss: {test_loss:.4f} {metric_name}: {test_metric_score:.4f}')
 
 
-def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
-    total_loss, total_acc = 0, 0
+def eval_loop(model, plm_model, metric, dataloader, loss_fn, device=None):
+    total_loss = 0
     epoch_iterator = tqdm(dataloader)
     
     for batch in epoch_iterator:
@@ -182,13 +166,13 @@ def eval_loop(model, plm_model, metrics, dataloader, loss_fn, device=None):
         logits = model(plm_model, batch)
         loss = loss_fn(logits, label)
         total_loss += loss.item() * len(label)
-        acc = metrics(logits, label).item()
-        total_acc += acc * len(label)
-        epoch_iterator.set_postfix(eval_loss=loss.item(), eval_acc=acc)
+        metric_socre = metric(logits.squeeze(), label).item()
+        epoch_iterator.set_postfix(eval_loss=loss.item(), eval_metric=metric_socre)
     
     epoch_loss = total_loss / len(dataloader.dataset)
-    epoch_acc = total_acc / len(dataloader.dataset)
-    return epoch_loss, epoch_acc
+    epoch_metric_score = metric.compute()
+    metric.reset()
+    return epoch_loss, epoch_metric_score
 
 
 if __name__ == "__main__":
@@ -204,6 +188,8 @@ if __name__ == "__main__":
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
+    parser.add_argument('--dataset', type=str, default=None, required=True, help='dataset name')
+    parser.add_argument('--pdb_type', type=str, default='ef', help='pdb type')
     parser.add_argument('--train_file', type=str, default=None, help='train file')
     parser.add_argument('--val_file', type=str, default=None, help='val file')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
@@ -218,8 +204,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_train_epochs', type=int, default=20, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
-    parser.add_argument('--monitor', type=str, default='val_acc', choices=['val_acc','val_loss'], help='monitor metric')
-    parser.add_argument('--eval_every_n_steps', type=int, default=-1, help='evaluate every n steps')
+    parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
@@ -232,7 +217,6 @@ if __name__ == "__main__":
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
     parser.add_argument('--wandb_project', type=str, default='LocSeek')
-    parser.add_argument("--wandb_entity", type=str, default="matwings")
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
     args = parser.parse_args()
@@ -240,13 +224,12 @@ if __name__ == "__main__":
     # init wandb
     if args.wandb:
         if args.wandb_run_name is None:
-            args.wandb_run_name = f"LocSeek"
+            args.wandb_run_name = f"Adapter-{args.dataset}"
         if args.model_name is None:
             args.model_name = f"{args.wandb_run_name}.pt"
         
         wandb.init(
-            project=args.wandb_project, name=args.wandb_run_name, 
-            entity=args.wandb_entity, config=vars(args)
+            project=args.wandb_project, name=args.wandb_run_name, config=vars(args)
         )
     
     # create checkpoint directory
@@ -257,11 +240,10 @@ if __name__ == "__main__":
         args.ckpt_dir = os.path.join(args.ckpt_root, args.ckpt_dir)
     os.makedirs(args.ckpt_dir, exist_ok=True)
     
-    # load protein language model
     set_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # build tokenizer
+    # build tokenizer and protein language model
     if "esm" in args.plm_model:
         tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
         plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
@@ -280,11 +262,17 @@ if __name__ == "__main__":
         args.hidden_size = plm_model.config.d_model
     
     args.vocab_size = plm_model.config.vocab_size
+    if args.train_file is None:
+        args.train_file = f"data/{args.dataset}/{args.pdb_type}_train.json"
+    if args.val_file is None:
+        args.val_file = f"data/{args.dataset}/{args.pdb_type}_val.json"
+    if args.test_file is None:
+        args.test_file = f"data/{args.dataset}/{args.pdb_type}_test.json"
     if args.num_labels is None:
-        args.num_labels = dataset_to_label[args.train_file.split("/")[1]]
+        args.num_labels = DATASET_TO_NUM_LABELS[args.dataset]
     
     # load locseek model
-    model = LocSeekModel(args)
+    model = AdapterModel(args)
     model.to(device)
 
     def param_num(model):
@@ -329,7 +317,6 @@ if __name__ == "__main__":
                 aa_seq = e["aa_seq"][:args.max_seq_len]
                 foldseek_seq = e["foldseek_seq"][:args.max_seq_len]
                 ss8_seq = e["ss8_seq"][:args.max_seq_len]
-            
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
@@ -353,28 +340,39 @@ if __name__ == "__main__":
             aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
             foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
             ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
+        
+        if 'classification' in DATASET_TO_TASK[args.dataset]:
+            labels = torch.as_tensor(labels, dtype=torch.long)
+        elif 'regression' in DATASET_TO_TASK[args.dataset]:
+            labels = torch.as_tensor(labels, dtype=torch.float)
         
         return {
             "aa_input_ids": aa_input_ids, 
             "attention_mask": attention_mask, 
             "foldseek_input_ids": foldseek_input_ids, 
             "ss8_input_ids": ss8_input_ids,
-            "label": torch.as_tensor(labels, dtype=torch.long)
+            "label": labels
             }
         
     # metrics, optimizer, dataloader
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
-    metrics = Accuracy(task="multiclass", num_classes=args.num_labels).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    if args.loss_fn == "cross_entropy":
-        loss_fn = nn.CrossEntropyLoss()
-    elif args.loss_fn == "focal_loss":
-        train_labels = [e["label"] for e in train_dataset]
-        alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_labels)]
-        print(">>> alpha: ", alpha)
-        loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
+    metrics = DATASET_TO_METRICS[args.dataset]
+    if args.monitor is None:
+        args.monitor = DATASET_TO_MONITOR[args.dataset]
+    if DATASET_TO_TASK[args.dataset] == "single_label_classification":
+        if args.loss_fn == "cross_entropy":
+            loss_fn = nn.CrossEntropyLoss()
+        elif args.loss_fn == "focal_loss":
+            train_labels = [e["label"] for e in train_dataset]
+            alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_labels)]
+            print(">>> alpha: ", alpha)
+            loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
+    elif DATASET_TO_TASK[args.dataset] == "regression":
+        loss_fn = nn.MSELoss()
     
     train_loader = DataLoader(
         train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
