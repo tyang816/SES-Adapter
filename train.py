@@ -17,18 +17,23 @@ from torchmetrics.regression import SpearmanCorrCoef
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5EncoderModel, AutoTokenizer
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
+from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
 from src.models.adapter import AdapterModel
+from src.utils.metrics import MultilabelF1Max
+from src.utils.loss_fn import MultiClassFocalLossWithAlpha
 
 # ignore warning information
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
+
 DATASET_TO_NUM_LABELS = {
     "DeepLocBinary": 2, "DeepLocMulti": 10, 
     "DeepSol": 2, "DeepSoluE": 2,
-    "MetalIonBinding": 2, "Thermostability": 1
+    "MetalIonBinding": 2, "Thermostability": 1,
+    "EC": 585
 }
 DATASET_TO_TASK = {
     "DeepLocBinary": "single_label_classification", 
@@ -37,15 +42,24 @@ DATASET_TO_TASK = {
     "DeepSoluE": "single_label_classification",
     "MetalIonBinding": "single_label_classification", 
     "Thermostability": "regression",
+    "EC": "multi_label_classification"
 }
 # valid and test metrics
 DATASET_TO_METRICS = {
-    "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
-    "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=10)),
-    "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
-    "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
-    "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=2)),
-    "Thermostability": ("spearman_corr", SpearmanCorrCoef())
+    "DeepLocBinary": 
+        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
+    "DeepLocMulti": 
+        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
+    "DeepSol": 
+        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
+    "DeepSoluE": 
+        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
+    "MetalIonBinding": 
+        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
+    "Thermostability": 
+        ("spearman_corr", SpearmanCorrCoef()),
+    "EC": 
+        ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"]))
 }
 DATASET_TO_MONITOR = {
     "DeepLocBinary": "accuracy",
@@ -53,7 +67,8 @@ DATASET_TO_MONITOR = {
     "DeepSol": "accuracy",
     "DeepSoluE": "accuracy",
     "MetalIonBinding": "accuracy",
-    "Thermostability": "spearman_corr"
+    "Thermostability": "spearman_corr",
+    "EC": "f1_max"
 }
 DATASET_TO_NORMALIZE = {
     "DeepLocBinary": None,
@@ -61,7 +76,8 @@ DATASET_TO_NORMALIZE = {
     "DeepSol": None,
     "DeepSoluE": None,
     "MetalIonBinding": None,
-    "Thermostability": "min_max"
+    "Thermostability": "min_max",
+    "EC": None
 }
 
 def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
@@ -74,30 +90,6 @@ def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
     for e in test_dataset:
         e["label"] = (e["label"] - min_label) / (max_label - min_label)
     return train_dataset, val_dataset, test_dataset
-
-
-class MultiClassFocalLossWithAlpha(nn.Module):
-    def __init__(self, num_classes, alpha=None, gamma=1, reduction='mean', device="cuda"):
-        super(MultiClassFocalLossWithAlpha, self).__init__()
-        if alpha is None:
-            self.alpha = torch.ones(num_classes, dtype=torch.float32)
-        self.alpha = torch.tensor(alpha).to(device)
-        self.gamma = gamma
-        self.reduction = reduction
-
-    def forward(self, pred, target):
-        alpha = self.alpha[target]
-        log_softmax = torch.log_softmax(pred, dim=1)
-        logpt = torch.gather(log_softmax, dim=1, index=target.view(-1, 1))
-        logpt = logpt.view(-1)
-        ce_loss = -logpt
-        pt = torch.exp(logpt)
-        focal_loss = alpha * (1 - pt) ** self.gamma * ce_loss
-        if self.reduction == "mean":
-            return torch.mean(focal_loss)
-        if self.reduction == "sum":
-            return torch.sum(focal_loss)
-        return focal_loss
 
 
 def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, 
@@ -120,7 +112,12 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                     batch[k] = v.to(device)
                 label = batch["label"]
                 logits = model(plm_model, batch)
-                loss = loss_fn(logits, label)
+                if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
+                    loss = loss_fn(logits.squeeze(), label.squeeze())
+                if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+                    loss = loss_fn(logits, label.float())
+                else:
+                    loss = loss_fn(logits, label)
                 epoch_train_loss += loss.item() * len(label)                
                 global_steps += 1
                 accelerator.backward(loss)
@@ -136,7 +133,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
         # eval every epoch
         model.eval()
         with torch.no_grad():
-            val_loss, val_metric_score = eval_loop(model, plm_model, metric, val_loader, loss_fn, device)
+            val_loss, val_metric_score = eval_loop(args, model, plm_model, metric, val_loader, loss_fn, device)
             val_metric_list.append(val_metric_score)
             val_loss_list.append(val_loss)
             if args.wandb:
@@ -169,13 +166,13 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_metric_score = eval_loop(model, plm_model, metric, test_loader, loss_fn, device)
+        test_loss, test_metric_score = eval_loop(args, model, plm_model, metric, test_loader, loss_fn, device)
         if args.wandb:
             wandb.log({"test/loss": test_loss, f"test/{metric_name}": test_metric_score})
     print(f'TEST loss: {test_loss:.4f} {metric_name}: {test_metric_score:.4f}')
 
 
-def eval_loop(model, plm_model, metric, dataloader, loss_fn, device=None):
+def eval_loop(args, model, plm_model, metric, dataloader, loss_fn, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
     
@@ -184,9 +181,16 @@ def eval_loop(model, plm_model, metric, dataloader, loss_fn, device=None):
             batch[k] = v.to(device)
         label = batch["label"]
         logits = model(plm_model, batch)
-        loss = loss_fn(logits, label)
+        if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
+            loss = loss_fn(logits.squeeze(), label.squeeze())
+            metric_socre = metric(logits.squeeze(), label.squeeze()).item()
+        if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+            loss = loss_fn(logits, label.float())
+            metric_socre = metric(logits, label).item()
+        else:
+            loss = loss_fn(logits, label)
+            metric_socre = metric(logits, label).item()
         total_loss += loss.item() * len(label)
-        metric_socre = metric(logits.squeeze(), label).item()
         epoch_iterator.set_postfix(eval_loss=loss.item(), eval_metric=metric_socre)
     
     epoch_loss = total_loss / len(dataloader.dataset)
@@ -366,10 +370,12 @@ if __name__ == "__main__":
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
         
-        if 'classification' in DATASET_TO_TASK[args.dataset]:
+        if DATASET_TO_TASK[args.dataset] == 'single_label_classification':
             labels = torch.as_tensor(labels, dtype=torch.long)
-        elif 'regression' in DATASET_TO_TASK[args.dataset]:
+        elif DATASET_TO_TASK[args.dataset] == 'regression':
             labels = torch.as_tensor(labels, dtype=torch.float)
+        elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+            labels = torch.as_tensor(labels, dtype=torch.long)
         
         return {
             "aa_input_ids": aa_input_ids, 
@@ -395,6 +401,8 @@ if __name__ == "__main__":
             loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
     elif DATASET_TO_TASK[args.dataset] == "regression":
         loss_fn = nn.MSELoss()
+    elif DATASET_TO_TASK[args.dataset] == "multi_label_classification":
+        loss_fn = nn.BCEWithLogitsLoss()
     
     train_loader = DataLoader(
         train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
