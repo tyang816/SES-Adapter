@@ -33,7 +33,8 @@ DATASET_TO_NUM_LABELS = {
     "DeepLocBinary": 2, "DeepLocMulti": 10, 
     "DeepSol": 2, "DeepSoluE": 2,
     "MetalIonBinding": 2, "Thermostability": 1,
-    "EC": 585
+    "EC": 585,
+    "BP": 1943, "CC": 320, "MF": 489,
 }
 DATASET_TO_TASK = {
     "DeepLocBinary": "single_label_classification", 
@@ -42,24 +43,23 @@ DATASET_TO_TASK = {
     "DeepSoluE": "single_label_classification",
     "MetalIonBinding": "single_label_classification", 
     "Thermostability": "regression",
-    "EC": "multi_label_classification"
+    "EC": "multi_label_classification",
+    "BP": "multi_label_classification",
+    "CC": "multi_label_classification",
+    "MF": "multi_label_classification",
 }
 # valid and test metrics
 DATASET_TO_METRICS = {
-    "DeepLocBinary": 
-        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
-    "DeepLocMulti": 
-        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
-    "DeepSol": 
-        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
-    "DeepSoluE": 
-        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
-    "MetalIonBinding": 
-        ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
-    "Thermostability": 
-        ("spearman_corr", SpearmanCorrCoef()),
-    "EC": 
-        ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"]))
+    "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
+    "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
+    "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
+    "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
+    "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
+    "Thermostability": ("spearman_corr", SpearmanCorrCoef()),
+    "EC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"])),
+    "BP": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["BP"])),
+    "CC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["CC"])),
+    "MF": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["MF"])),
 }
 DATASET_TO_MONITOR = {
     "DeepLocBinary": "accuracy",
@@ -68,7 +68,10 @@ DATASET_TO_MONITOR = {
     "DeepSoluE": "accuracy",
     "MetalIonBinding": "accuracy",
     "Thermostability": "spearman_corr",
-    "EC": "f1_max"
+    "EC": "f1_max",
+    "BP": "f1_max",
+    "CC": "f1_max",
+    "MF": "f1_max",
 }
 DATASET_TO_NORMALIZE = {
     "DeepLocBinary": None,
@@ -77,7 +80,10 @@ DATASET_TO_NORMALIZE = {
     "DeepSoluE": None,
     "MetalIonBinding": None,
     "Thermostability": "min_max",
-    "EC": None
+    "EC": None,
+    "BP": None,
+    "CC": None,
+    "MF": None,
 }
 
 def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
@@ -114,7 +120,7 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                 logits = model(plm_model, batch)
                 if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
                     loss = loss_fn(logits.squeeze(), label.squeeze())
-                if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+                elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
                     loss = loss_fn(logits, label.float())
                 else:
                     loss = loss_fn(logits, label)
@@ -184,7 +190,7 @@ def eval_loop(args, model, plm_model, metric, dataloader, loss_fn, device=None):
         if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
             loss = loss_fn(logits.squeeze(), label.squeeze())
             metric_socre = metric(logits.squeeze(), label.squeeze()).item()
-        if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+        elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
             loss = loss_fn(logits, label.float())
             metric_socre = metric(logits, label).item()
         else:
@@ -313,11 +319,19 @@ if __name__ == "__main__":
         dataset, token_num = [], []
         for l in open(file):
             data = json.loads(l)
-            dataset.append(data)
+            if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+                binary_list = [0] * args.num_labels
+                for index in data['label']:
+                    binary_list[index] = 1
+                data['label'] = binary_list
             if args.max_seq_len is not None:
+                data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
+                data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
+                data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
                 token_num.append(min(len(data["aa_seq"]), args.max_seq_len))
             else:
                 token_num.append(len(data["aa_seq"]))
+            dataset.append(data)
         return dataset, token_num
 
     train_dataset, train_token_num = load_dataset(args.train_file)
