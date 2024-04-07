@@ -28,7 +28,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --wandb_run_name wofsss_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"_0
 
 
-dataset=CC
+dataset=MF
 pdb_type=af
 pooling_head=mean
 plm_model=esm2_t33_650M_UR50D
