@@ -4,27 +4,32 @@ sbatch --export=dataset=DeepLocMulti,pooling_method=attention1d --job-name=deepl
 ############################################################################################################
 
 # ablation
-# dataset (esmfold & alphafold): DeepLocBinary DeepLocMulti MetalIonBinding
+# dataset (esmfold & alphafold): DeepLocBinary DeepLocMulti MetalIonBinding Thermostability EC MF BP CC
 # dataset (esmfold only): DeepSol DeepSoluE
 # plm_model (Facebook): esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
 # plm_model (RostLab): prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
-for dataset in DeepLocBinary DeepLocMulti MetalIonBinding
+for dataset in DeepLocBinary DeepLocMulti
 do
-    for pdb_type in ef af
+    for plm_model in prot_bert prot_bert_bfd ankh-base ankh-large
     do
-        for plm_model in esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
+        for pooling_method in mean
         do
-            for pooling_method in mean
-            do
-                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_wofs.slurm
-                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_woss.slurm
-                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train.slurm
-                sbatch --export=dataset=$dataset,pdb_type=$pdb_type,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_$pdb_type script/slurm/train_wofsss.slurm
-            done
+            sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train.slurm
+            sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train_wofs.slurm
+            sbatch --export=dataset=$dataset,pdb_type=af,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_af script/slurm/train_woss.slurm
+            
+            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train.slurm
+            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_wofsss.slurm
+            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_wofs.slurm
+            sbatch --export=dataset=$dataset,pdb_type=ef,pooling_method=$pooling_method,plm_model=$plm_model --job-name="$dataset"_"$pooling_method"_ef script/slurm/train_woss.slurm
         done
     done
 done
 
+for i in {6768..6809}
+do
+    scancel $i
+done
 
 ############################################################################################################
 

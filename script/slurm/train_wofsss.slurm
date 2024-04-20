@@ -27,8 +27,8 @@ python train.py \
     --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \
-    --max_train_epochs 15 \
-    --max_batch_token 50000 \
+    --max_train_epochs 50 \
+    --max_batch_token 120000 \
     --patience 5 \
     --ckpt_root result \
     --ckpt_dir $plm_model/$dataset \
