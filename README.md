@@ -33,13 +33,26 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 
 ## 🧬 Start with SES-Adapter
 
-coming soon..
+### Use The Provided Dataset
+
+We provide datasets and format references in the `dataset` folder.
+
+### Prepare Your Own Datset
+
+### Train
+
+See the `train.py` script for training details. Examples can be found in `scripts` folder.
 
 ## 🙌 Citation
 
 Please cite our work if you have used our code or data.
 
 ```
-
+@article{tan2024ses-adapter,
+  title={Simple, Efficient and Scalable Structure-aware Adapter Boosts Protein Language Models},
+  author={Tan, Yang and Li, Mingchen and Zhou, Bingxin and Zhong, Bozitao and Zheng, Lirong and Tan, Pan and Zhou, Ziyi and Yu, Huiqun and Fan, Guisheng and Hong, Liang},
+  journal={arXiv preprint arXiv:2404.14850},
+  year={2024}
+}
 ```
 
