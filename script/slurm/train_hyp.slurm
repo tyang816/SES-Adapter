@@ -22,8 +22,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_method \
     --pooling_dropout 0.25 \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr $lr \
     --num_workers 4 \
     --batch_size 64 \

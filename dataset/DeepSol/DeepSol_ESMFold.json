@@ -1,0 +1,12 @@
+{
+    "dataset": "DeepSol",
+    "pdb_type": "ESMFold",
+    "train_file": "dataset/DeepSol/ESMFold/train.json",
+    "valid_file": "dataset/DeepSol/ESMFold/valid.json",
+    "test_file": "dataset/DeepSol/ESMFold/test.json",
+    "num_labels": 2,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}

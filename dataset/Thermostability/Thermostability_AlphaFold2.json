@@ -1,0 +1,12 @@
+{
+    "dataset": "Thermostability",
+    "pdb_type": "AlphaFold2",
+    "train_file": "dataset/Thermostability/AlphaFold2/train.json",
+    "valid_file": "dataset/Thermostability/AlphaFold2/valid.json",
+    "test_file": "dataset/Thermostability/AlphaFold2/test.json",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "spearman_corr",
+    "monitor": "spearman_corr",
+    "normalize": "min_max"
+}

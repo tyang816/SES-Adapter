@@ -29,62 +29,62 @@ logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 
-DATASET_TO_NUM_LABELS = {
-    "DeepLocBinary": 2, "DeepLocMulti": 10, 
-    "DeepSol": 2, "DeepSoluE": 2,
-    "MetalIonBinding": 2, "Thermostability": 1,
-    "EC": 585,
-    "BP": 1943, "CC": 320, "MF": 489,
-}
-DATASET_TO_TASK = {
-    "DeepLocBinary": "single_label_classification", 
-    "DeepLocMulti": "single_label_classification",
-    "DeepSol": "single_label_classification", 
-    "DeepSoluE": "single_label_classification",
-    "MetalIonBinding": "single_label_classification", 
-    "Thermostability": "regression",
-    "EC": "multi_label_classification",
-    "BP": "multi_label_classification",
-    "CC": "multi_label_classification",
-    "MF": "multi_label_classification",
-}
-# valid and test metrics
-DATASET_TO_METRICS = {
-    "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
-    "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
-    "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
-    "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
-    "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
-    "Thermostability": ("spearman_corr", SpearmanCorrCoef()),
-    "EC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"])),
-    "BP": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["BP"])),
-    "CC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["CC"])),
-    "MF": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["MF"])),
-}
-DATASET_TO_MONITOR = {
-    "DeepLocBinary": "accuracy",
-    "DeepLocMulti": "accuracy",
-    "DeepSol": "accuracy",
-    "DeepSoluE": "accuracy",
-    "MetalIonBinding": "accuracy",
-    "Thermostability": "spearman_corr",
-    "EC": "f1_max",
-    "BP": "f1_max",
-    "CC": "f1_max",
-    "MF": "f1_max",
-}
-DATASET_TO_NORMALIZE = {
-    "DeepLocBinary": None,
-    "DeepLocMulti": None,
-    "DeepSol": None,
-    "DeepSoluE": None,
-    "MetalIonBinding": None,
-    "Thermostability": "min_max",
-    "EC": None,
-    "BP": None,
-    "CC": None,
-    "MF": None,
-}
+# DATASET_TO_NUM_LABELS = {
+#     "DeepLocBinary": 2, "DeepLocMulti": 10, 
+#     "DeepSol": 2, "DeepSoluE": 2,
+#     "MetalIonBinding": 2, "Thermostability": 1,
+#     "EC": 585,
+#     "BP": 1943, "CC": 320, "MF": 489,
+# }
+# DATASET_TO_TASK = {
+#     "DeepLocBinary": "single_label_classification", 
+#     "DeepLocMulti": "single_label_classification",
+#     "DeepSol": "single_label_classification", 
+#     "DeepSoluE": "single_label_classification",
+#     "MetalIonBinding": "single_label_classification", 
+#     "Thermostability": "regression",
+#     "EC": "multi_label_classification",
+#     "BP": "multi_label_classification",
+#     "CC": "multi_label_classification",
+#     "MF": "multi_label_classification",
+# }
+# # valid and test metrics
+# DATASET_TO_METRICS = {
+#     "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
+#     "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
+#     "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
+#     "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
+#     "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
+#     "Thermostability": ("spearman_corr", SpearmanCorrCoef()),
+#     "EC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"])),
+#     "BP": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["BP"])),
+#     "CC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["CC"])),
+#     "MF": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["MF"])),
+# }
+# DATASET_TO_MONITOR = {
+#     "DeepLocBinary": "accuracy",
+#     "DeepLocMulti": "accuracy",
+#     "DeepSol": "accuracy",
+#     "DeepSoluE": "accuracy",
+#     "MetalIonBinding": "accuracy",
+#     "Thermostability": "spearman_corr",
+#     "EC": "f1_max",
+#     "BP": "f1_max",
+#     "CC": "f1_max",
+#     "MF": "f1_max",
+# }
+# DATASET_TO_NORMALIZE = {
+#     "DeepLocBinary": None,
+#     "DeepLocMulti": None,
+#     "DeepSol": None,
+#     "DeepSoluE": None,
+#     "MetalIonBinding": None,
+#     "Thermostability": "min_max",
+#     "EC": None,
+#     "BP": None,
+#     "CC": None,
+#     "MF": None,
+# }
 
 def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
     labels = [e["label"] for e in train_dataset]
@@ -98,12 +98,10 @@ def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
     return train_dataset, val_dataset, test_dataset
 
 
-def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, 
+def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_loader, test_loader, 
           loss_fn, optimizer, device):
     best_val_loss, best_val_metric_score = float("inf"), -float("inf")
     val_loss_list, val_metric_list = [], []
-    metric_name, metric = metrics
-    metric = metric.to(device)
     path = os.path.join(args.ckpt_dir, args.model_name)
     global_steps = 0
     for epoch in range(args.max_train_epochs):
@@ -118,9 +116,9 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
                     batch[k] = v.to(device)
                 label = batch["label"]
                 logits = model(plm_model, batch)
-                if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
+                if args.problem_type == 'regression' and args.num_labels == 1:
                     loss = loss_fn(logits.squeeze(), label.squeeze())
-                elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+                elif args.problem_type == 'multi_label_classification':
                     loss = loss_fn(logits, label.float())
                 else:
                     loss = loss_fn(logits, label)
@@ -139,19 +137,26 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
         # eval every epoch
         model.eval()
         with torch.no_grad():
-            val_loss, val_metric_score = eval_loop(args, model, plm_model, metric, val_loader, loss_fn, device)
+            val_loss, val_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_fn, device)
+            val_metric_score = val_metric_dict[args.monitor]
             val_metric_list.append(val_metric_score)
             val_loss_list.append(val_loss)
+            
             if args.wandb:
-                wandb.log({"valid/loss": val_loss, f"valid/{metric_name}": val_metric_score, "valid/epoch": epoch})
-        print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} {metric_name}: {val_metric_score:.4f}')
+                val_log = {"valid/loss": val_loss, "valid/epoch": epoch}
+                for metric_name, metric_score in val_metric_dict.items():
+                    val_log[f"valid/{metric_name}"] = metric_score
+                wandb.log(val_log)
+            print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} {args.monitor}: {val_metric_score:.4f}')
     
         # early stopping
         if args.monitor == "loss":
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}, {metric_name}: {val_metric_score:.4f}')
+                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}')
+                for metric_name, metric_score in val_metric_dict.items():
+                    print(f'>>> {metric_name}: {metric_score:.4f}')
                 print(f'>>> Save model to {path}')
             
             if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
@@ -161,7 +166,9 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
             if val_metric_score > best_val_metric_score:
                 best_val_metric_score = val_metric_score
                 torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}, {metric_name}: {best_val_metric_score:.4f}')
+                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}')
+                for metric_name, metric_score in val_metric_dict.items():
+                    print(f'>>> {metric_name}: {metric_score:.4f}')
                 print(f'>>> Save model to {path}')
             
             if len(val_metric_list) - val_metric_list.index(max(val_metric_list)) > args.patience:
@@ -172,37 +179,46 @@ def train(args, model, plm_model, accelerator, metrics, train_loader, val_loader
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_metric_score = eval_loop(args, model, plm_model, metric, test_loader, loss_fn, device)
+        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_fn, device)
+        test_metric_score = test_metric_dict[args.monitor]
+        
         if args.wandb:
-            wandb.log({"test/loss": test_loss, f"test/{metric_name}": test_metric_score})
-    print(f'TEST loss: {test_loss:.4f} {metric_name}: {test_metric_score:.4f}')
+            test_log = {"test/loss": test_loss, "test/epoch": epoch}
+            for metric_name, metric_score in val_metric_dict.items():
+                test_log[f"test/{metric_name}"] = metric_score
+            wandb.log(test_log)
+        print(f'EPOCH {epoch} TEST loss: {test_loss:.4f} {args.monitor}: {test_metric_score:.4f}')
 
 
-def eval_loop(args, model, plm_model, metric, dataloader, loss_fn, device=None):
+def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
-    
+    metrics_result_dict = {}
     for batch in epoch_iterator:
+        step_log = {}
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
         logits = model(plm_model, batch)
-        if DATASET_TO_TASK[args.dataset] == 'regression' and DATASET_TO_NUM_LABELS[args.dataset] == 1:
-            loss = loss_fn(logits.squeeze(), label.squeeze())
-            metric_socre = metric(logits.squeeze(), label.squeeze()).item()
-        elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
-            loss = loss_fn(logits, label.float())
-            metric_socre = metric(logits, label).item()
-        else:
-            loss = loss_fn(logits, label)
-            metric_socre = metric(logits, label).item()
+        for metric_name, metric in metrics_dict.items():
+            if args.problem_type == 'regression' and args.num_labels == 1:
+                loss = loss_fn(logits.squeeze(), label.squeeze())
+                metric_socre = metric(logits.squeeze(), label.squeeze()).item()
+            elif args.problem_type == 'multi_label_classification':
+                loss = loss_fn(logits, label.float())
+                metric_socre = metric(logits, label).item()
+            else:
+                loss = loss_fn(logits, label)
+                metric_socre = metric(logits, label).item()
+            step_log[metric_name] = metric_socre
         total_loss += loss.item() * len(label)
-        epoch_iterator.set_postfix(eval_loss=loss.item(), eval_metric=metric_socre)
+        epoch_iterator.set_postfix(eval_loss=loss.item(), **step_log)
     
     epoch_loss = total_loss / len(dataloader.dataset)
-    epoch_metric_score = metric.compute()
-    metric.reset()
-    return epoch_loss, epoch_metric_score
+    for metric_name, metric in metrics_dict.items():
+        metrics_result_dict[metric_name] = metric.compute().item()
+        metric.reset()
+    return epoch_loss, metrics_result_dict
 
 
 if __name__ == "__main__":
@@ -213,16 +229,19 @@ if __name__ == "__main__":
     parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
-    parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
-    parser.add_argument('--dataset', type=str, default=None, required=True, help='dataset name')
+    parser.add_argument('--dataset', type=str, default=None, help='dataset name')
+    parser.add_argument('--dataset_config', type=str, default=None, help='config of dataset')
+    parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
+    parser.add_argument('--problem_type', type=str, default=None, help='problem type')
     parser.add_argument('--pdb_type', type=str, default='ef', help='pdb type')
     parser.add_argument('--train_file', type=str, default=None, help='train file')
-    parser.add_argument('--val_file', type=str, default=None, help='val file')
+    parser.add_argument('--valid_file', type=str, default=None, help='val file')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
+    parser.add_argument('--metrics', nargs='+', default=None, help='computation metrics')
     
     # train model
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
@@ -246,10 +265,55 @@ if __name__ == "__main__":
     
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
-    parser.add_argument('--wandb_project', type=str, default='LocSeek')
+    parser.add_argument('--wandb_project', type=str, default='SES-Adapter')
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
     args = parser.parse_args()
+    
+    set_seed(args.seed)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    dataset_config = json.loads(open(args.dataset_config).read())
+    if args.dataset is None:
+        args.dataset = dataset_config['dataset']
+    if args.pdb_type is None:
+        args.pdb_type = dataset_config['pdb_type']
+    if args.train_file is None:
+        args.train_file = dataset_config['train_file']
+    if args.valid_file is None:
+        args.valid_file = dataset_config['valid_file']
+    if args.test_file is None:
+        args.test_file = dataset_config['test_file']
+    if args.num_labels is None:
+        args.num_labels = dataset_config['num_labels']
+    if args.problem_type is None:
+        args.problem_type = dataset_config['problem_type']
+    if args.monitor is None:
+        args.monitor = dataset_config['monitor']
+    metrics_dict = {}
+    if args.metrics is None:
+        args.metrics = dataset_config['metrics']
+        if args.metrics != 'None' and type(args.metrics) != list:
+            args.metrics = [args.metrics]
+            for m in args.metrics:
+                if m == 'accuracy':
+                    metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_labels)
+                elif m == 'f1_max':
+                    metrics_dict[m] = MultilabelF1Max(num_labels=args.num_labels)
+                elif m == 'spearman_corr':
+                    metrics_dict[m] = SpearmanCorrCoef()
+                else:
+                    raise ValueError(f"Invalid metric: {m}")
+            for metric_name, metric in metrics_dict.items():
+                metric.to(device)
+    
+    # create checkpoint directory
+    if args.ckpt_dir is None:
+        current_date = strftime("%Y%m%d", localtime())
+        args.ckpt_dir = os.path.join(args.ckpt_root, current_date)
+    else:
+        args.ckpt_dir = os.path.join(args.ckpt_root, args.ckpt_dir)
+    os.makedirs(args.ckpt_dir, exist_ok=True)
     
     # init wandb
     if args.wandb:
@@ -261,17 +325,6 @@ if __name__ == "__main__":
         wandb.init(
             project=args.wandb_project, name=args.wandb_run_name, config=vars(args)
         )
-    
-    # create checkpoint directory
-    if args.ckpt_dir is None:
-        current_date = strftime("%Y%m%d", localtime())
-        args.ckpt_dir = os.path.join(args.ckpt_root, current_date)
-    else:
-        args.ckpt_dir = os.path.join(args.ckpt_root, args.ckpt_dir)
-    os.makedirs(args.ckpt_dir, exist_ok=True)
-    
-    set_seed(args.seed)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # build tokenizer and protein language model
     if "esm" in args.plm_model:
@@ -292,14 +345,7 @@ if __name__ == "__main__":
         args.hidden_size = plm_model.config.d_model
     
     args.vocab_size = plm_model.config.vocab_size
-    if args.train_file is None:
-        args.train_file = f"dataset/{args.dataset}/{args.pdb_type}_train.json"
-    if args.val_file is None:
-        args.val_file = f"dataset/{args.dataset}/{args.pdb_type}_val.json"
-    if args.test_file is None:
-        args.test_file = f"dataset/{args.dataset}/{args.pdb_type}_test.json"
-    if args.num_labels is None:
-        args.num_labels = DATASET_TO_NUM_LABELS[args.dataset]
+    
     
     # load adapter model
     model = AdapterModel(args)
@@ -319,7 +365,7 @@ if __name__ == "__main__":
         dataset, token_num = [], []
         for l in open(file):
             data = json.loads(l)
-            if DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+            if args.problem_type == 'multi_label_classification':
                 binary_list = [0] * args.num_labels
                 for index in data['label']:
                     binary_list[index] = 1
@@ -335,9 +381,9 @@ if __name__ == "__main__":
         return dataset, token_num
 
     train_dataset, train_token_num = load_dataset(args.train_file)
-    val_dataset, val_token_num = load_dataset(args.val_file)
+    val_dataset, val_token_num = load_dataset(args.valid_file)
     test_dataset, test_token_num = load_dataset(args.test_file)
-    if DATASET_TO_NORMALIZE[args.dataset] == "min_max":
+    if dataset_config['normalize'] == 'min_max':
         train_dataset, val_dataset, test_dataset = min_max_normalize_dataset(train_dataset, val_dataset, test_dataset)
     
     print(">>> trainset: ", len(train_dataset))
@@ -384,11 +430,9 @@ if __name__ == "__main__":
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
         
-        if DATASET_TO_TASK[args.dataset] == 'single_label_classification':
-            labels = torch.as_tensor(labels, dtype=torch.long)
-        elif DATASET_TO_TASK[args.dataset] == 'regression':
+        if args.problem_type == 'regression':
             labels = torch.as_tensor(labels, dtype=torch.float)
-        elif DATASET_TO_TASK[args.dataset] == 'multi_label_classification':
+        else:
             labels = torch.as_tensor(labels, dtype=torch.long)
         
         return {
@@ -402,10 +446,8 @@ if __name__ == "__main__":
     # metrics, optimizer, dataloader
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    metrics = DATASET_TO_METRICS[args.dataset]
-    if args.monitor is None:
-        args.monitor = DATASET_TO_MONITOR[args.dataset]
-    if DATASET_TO_TASK[args.dataset] == "single_label_classification":
+    
+    if args.problem_type == "single_label_classification":
         if args.loss_fn == "cross_entropy":
             loss_fn = nn.CrossEntropyLoss()
         elif args.loss_fn == "focal_loss":
@@ -413,9 +455,9 @@ if __name__ == "__main__":
             alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_labels)]
             print(">>> alpha: ", alpha)
             loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
-    elif DATASET_TO_TASK[args.dataset] == "regression":
+    elif args.problem_type == "regression":
         loss_fn = nn.MSELoss()
-    elif DATASET_TO_TASK[args.dataset] == "multi_label_classification":
+    elif args.problem_type == "multi_label_classification":
         loss_fn = nn.BCEWithLogitsLoss()
     
     train_loader = DataLoader(
@@ -436,7 +478,7 @@ if __name__ == "__main__":
     )
     
     print("---------- Start Training ----------")
-    train(args, model, plm_model, accelerator, metrics, train_loader, val_loader, test_loader, loss_fn, optimizer, device)
+    train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_loader, test_loader, loss_fn, optimizer, device)
     
     if args.wandb:
         wandb.finish()

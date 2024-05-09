@@ -1,0 +1,12 @@
+{
+    "dataset": "DeepLocBinary",
+    "pdb_type": "ESMFold",
+    "train_file": "dataset/DeepLocBinary/ESMFold/train.json",
+    "valid_file": "dataset/DeepLocBinary/ESMFold/valid.json",
+    "test_file": "dataset/DeepLocBinary/ESMFold/test.json",
+    "num_labels": 2,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}

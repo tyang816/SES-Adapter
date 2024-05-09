@@ -1,0 +1,12 @@
+{
+    "dataset": "Thermostability",
+    "pdb_type": "ESMFold",
+    "train_file": "dataset/Thermostability/ESMFold/train.json",
+    "valid_file": "dataset/Thermostability/ESMFold/valid.json",
+    "test_file": "dataset/Thermostability/ESMFold/test.json",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "spearman_corr",
+    "monitor": "spearman_corr",
+    "normalize": "min_max"
+}

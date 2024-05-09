@@ -6,11 +6,12 @@ import warnings
 import torch.nn as nn
 from tqdm import tqdm
 from torchmetrics.classification import Accuracy, MulticlassMatthewsCorrCoef, F1Score, Recall
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, T5Tokenizer, T5Model
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
+from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from transformers import logging
 from torch.utils.data import DataLoader
 from src.utils.data_utils import BatchSampler
-from src.models.locseek import LocSeekModel
+from src.models.adapter import AdapterModel
 
 # ignore warning information
 logging.set_verbosity_error()
@@ -49,14 +50,13 @@ if __name__ == '__main__':
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
-    
+    # dataset
     parser.add_argument('--test_file', type=str, default=None, help='test file')
     parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--max_batch_token', type=int, default=10000, help='max number of token per batch')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
-    
     
     # model path
     parser.add_argument('--model_name', type=str, default=None, help='model name')
@@ -66,28 +66,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # build tokenizer
+    # build tokenizer and protein language model
     if "esm" in args.plm_model:
-        aa_tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        foldseek_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/foldseek.txt")
-        ss8_tokenizer = EsmTokenizer(vocab_file="src/vocab/esm/ss8.txt")
+        tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
         plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
     elif "bert" in args.plm_model:
-        aa_tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        foldseek_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/foldseek.txt", do_lower_case=False)
-        ss8_tokenizer = BertTokenizer(vocab_file="src/vocab/prot_bert/ss8.txt", do_lower_case=False)
+        tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = BertModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
     elif "prot_t5" in args.plm_model:
-        aa_tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        foldseek_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/foldseek.txt", do_lower_case=False)
-        ss8_tokenizer = T5Tokenizer(vocab_file="src/vocab/prot_t5/ss8.txt", do_lower_case=False)
-        plm_model = T5Model.from_pretrained(args.plm_model).to(device).eval()
+        tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.d_model
+    elif "ankh" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    # load locseek model
-    model = LocSeekModel(args)
+    args.vocab_size = plm_model.config.vocab_size
+    
+    # load adapter model
+    model = AdapterModel(args)
     model_path = f"{args.ckpt_root}/{args.ckpt_dir}/{args.model_name}"
     model.load_state_dict(torch.load(model_path))
     model.to(device).eval()
@@ -104,37 +104,50 @@ if __name__ == '__main__':
     def collate_fn(examples):
         aa_seqs, foldseek_seqs, ss8_seqs, labels = [], [], [], []
         for e in examples:
-            aa_seq, foldseek_seq, ss8_seq = e['aa_seq'], e['foldseek_seq'], e['ss8_seq']
+            aa_seq, foldseek_seq, ss8_seq = e["aa_seq"], e["foldseek_seq"], e["ss8_seq"]
             
             if args.max_seq_len is not None:
-                aa_seq = aa_seq[:args.max_seq_len]
-                foldseek_seq = foldseek_seq[:args.max_seq_len]
-                ss8_seq = ss8_seq[:args.max_seq_len]
-
+                aa_seq = e["aa_seq"][:args.max_seq_len]
+                foldseek_seq = e["foldseek_seq"][:args.max_seq_len]
+                ss8_seq = e["ss8_seq"][:args.max_seq_len]
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
                 foldseek_seq = " ".join(list(foldseek_seq))
                 ss8_seq = " ".join(list(ss8_seq))
+            elif 'ankh' in args.plm_model:
+                aa_seq = list(aa_seq)
+                foldseek_seq = list(foldseek_seq)
+                ss8_seq = list(ss8_seq)
             
             aa_seqs.append(aa_seq)
             foldseek_seqs.append(foldseek_seq)
             ss8_seqs.append(ss8_seq)
             labels.append(e["label"])
         
-        aa_inputs = aa_tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
+        if 'ankh' in args.plm_model:
+            aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
+            foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+            ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+        else:
+            aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
+            foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+            ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
         
-        foldseek_input_ids = foldseek_tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-        ss8_input_ids = ss8_tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        if args.problem_type == 'regression':
+            labels = torch.as_tensor(labels, dtype=torch.float)
+        else:
+            labels = torch.as_tensor(labels, dtype=torch.long)
         
         return {
             "aa_input_ids": aa_input_ids, 
             "attention_mask": attention_mask, 
             "foldseek_input_ids": foldseek_input_ids, 
             "ss8_input_ids": ss8_input_ids,
-            "label": torch.as_tensor(labels, dtype=torch.long)
+            "label": labels
             }
         
     loss_fn = nn.CrossEntropyLoss()

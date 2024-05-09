@@ -1,0 +1,12 @@
+{
+    "dataset": "MetalIonBinding",
+    "pdb_type": "ESMFold",
+    "train_file": "dataset/MetalIonBinding/ESMFold/train.json",
+    "valid_file": "dataset/MetalIonBinding/ESMFold/valid.json",
+    "test_file": "dataset/MetalIonBinding/ESMFold/test.json",
+    "num_labels": 2,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}

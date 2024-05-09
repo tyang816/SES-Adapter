@@ -1,9 +1,9 @@
-# dataset (esmfold & alphafold): DeepLocBinary DeepLocMulti MetalIonBinding EC Thermostability
-# dataset (esmfold only): DeepSol DeepSoluE
+# dataset (ESMFold & AlphaFold2): DeepLocBinary DeepLocMulti MetalIonBinding EC Thermostability
+# dataset (ESMFold only): DeepSol DeepSoluE
 # plm_model (Facebook): esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
-# plm_model (RostLab): prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
-dataset=DeepSol
-pdb_type=ef
+# plm_model (RostLab): prot_bert prot_bert_bfd prot_t5_xl_unirESMFold50 prot_t5_xl_bfd ankh-base ankh-large
+dataset=Thermostability
+pdb_type=AlphaFold2
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
@@ -12,12 +12,11 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.1 \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \
-    --max_train_epochs 10 \
+    --max_train_epochs 50 \
     --max_batch_token 60000 \
     --patience 3 \
     --use_foldseek \
@@ -30,7 +29,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
 dataset=DeepSoluE
-pdb_type=ef
+pdb_type=ESMFold
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
@@ -39,8 +38,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.1 \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \
@@ -56,7 +54,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --wandb_run_name woss_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
 dataset=DeepSoluE
-pdb_type=ef
+pdb_type=ESMFold
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
@@ -65,8 +63,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.1 \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \
@@ -82,7 +79,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --wandb_run_name wofs_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
 dataset=esm2_t33_650M_UR50D
-pdb_type=ef
+pdb_type=ESMFold
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
@@ -91,8 +88,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.1 \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \

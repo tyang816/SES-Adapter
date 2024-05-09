@@ -1,0 +1,12 @@
+{
+    "dataset": "MetalIonBinding",
+    "pdb_type": "AlphaFold2",
+    "train_file": "dataset/MetalIonBinding/AlphaFold2/train.json",
+    "valid_file": "dataset/MetalIonBinding/AlphaFold2/valid.json",
+    "test_file": "dataset/MetalIonBinding/AlphaFold2/test.json",
+    "num_labels": 2,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}

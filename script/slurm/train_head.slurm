@@ -27,8 +27,7 @@ python train.py \
     --num_attention_heads $num_heads \
     --pooling_method mean \
     --pooling_dropout $pooling_dropout \
-    --dataset $dataset \
-    --pdb_type $pdb_type \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
     --lr 5e-4 \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \

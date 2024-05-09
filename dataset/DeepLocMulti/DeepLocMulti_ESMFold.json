@@ -1,0 +1,12 @@
+{
+    "dataset": "DeepLocMulti",
+    "pdb_type": "ESMFold",
+    "train_file": "dataset/DeepLocMulti/ESMFold/train.json",
+    "valid_file": "dataset/DeepLocMulti/ESMFold/valid.json",
+    "test_file": "dataset/DeepLocMulti/ESMFold/test.json",
+    "num_labels": 10,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}
