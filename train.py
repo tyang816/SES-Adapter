@@ -374,8 +374,10 @@ if __name__ == "__main__":
             data['label'] = binary_list
         if args.max_seq_len is not None:
             data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
-            data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
-            data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
+            if args.use_foldseek:
+                data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
+            if args.use_ss8:
+                data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
             token_num = min(len(data["aa_seq"]), args.max_seq_len)
         else:
             token_num = len(data["aa_seq"])
@@ -422,37 +424,51 @@ if __name__ == "__main__":
         print(">>> ", train_dataset[i])
     
     def collate_fn(examples):
-        aa_seqs, foldseek_seqs, ss8_seqs, labels = [], [], [], []
+        aa_seqs, labels = [], []
+        if args.use_foldseek:
+            foldseek_seqs = []
+        if args.use_ss8:
+            ss8_seqs = []
         for e in examples:
-            aa_seq, foldseek_seq, ss8_seq = e["aa_seq"], e["foldseek_seq"], e["ss8_seq"]
+            aa_seq = e["aa_seq"]
+            if args.use_foldseek:
+                foldseek_seq = e["foldseek_seq"]
+            if args.use_ss8:
+                ss8_seq = e["ss8_seq"]
             
-            if args.max_seq_len is not None:
-                aa_seq = e["aa_seq"][:args.max_seq_len]
-                foldseek_seq = e["foldseek_seq"][:args.max_seq_len]
-                ss8_seq = e["ss8_seq"][:args.max_seq_len]
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
-                foldseek_seq = " ".join(list(foldseek_seq))
-                ss8_seq = " ".join(list(ss8_seq))
+                if args.use_foldseek:
+                    foldseek_seq = " ".join(list(foldseek_seq))
+                if args.use_ss8:
+                    ss8_seq = " ".join(list(ss8_seq))
             elif 'ankh' in args.plm_model:
                 aa_seq = list(aa_seq)
-                foldseek_seq = list(foldseek_seq)
-                ss8_seq = list(ss8_seq)
+                if args.use_foldseek:
+                    foldseek_seq = list(foldseek_seq)
+                if args.use_ss8:
+                    ss8_seq = list(ss8_seq)
             
             aa_seqs.append(aa_seq)
-            foldseek_seqs.append(foldseek_seq)
-            ss8_seqs.append(ss8_seq)
+            if args.use_foldseek:
+                foldseek_seqs.append(foldseek_seq)
+            if args.use_ss8:
+                ss8_seqs.append(ss8_seq)
             labels.append(e["label"])
         
         if 'ankh' in args.plm_model:
             aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
-            foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
-            ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+            if args.use_foldseek:
+                foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+            if args.use_ss8:
+                ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
         else:
             aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
-            foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-            ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+            if args.use_foldseek:
+                foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+            if args.use_ss8:
+                ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         aa_input_ids = aa_inputs["input_ids"]
         attention_mask = aa_inputs["attention_mask"]
@@ -462,13 +478,12 @@ if __name__ == "__main__":
         else:
             labels = torch.as_tensor(labels, dtype=torch.long)
         
-        return {
-            "aa_input_ids": aa_input_ids, 
-            "attention_mask": attention_mask, 
-            "foldseek_input_ids": foldseek_input_ids, 
-            "ss8_input_ids": ss8_input_ids,
-            "label": labels
-            }
+        data_dict = {"aa_input_ids": aa_input_ids, "attention_mask": attention_mask, "label": labels}
+        if args.use_foldseek:
+            data_dict["foldseek_input_ids"] = foldseek_input_ids
+        if args.use_ss8:
+            data_dict["ss8_input_ids"] = ss8_input_ids
+        return data_dict
         
     # metrics, optimizer, dataloader
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
