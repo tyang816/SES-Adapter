@@ -7,12 +7,12 @@ pdb_type=AlphaFold2
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
-CUDA_VISIBLE_DEVICES=0 python train.py \
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
     --pooling_dropout 0.1 \
-    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
+    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type"_HF.json \
     --lr $lr \
     --num_workers 4 \
     --gradient_accumulation_steps 1 \

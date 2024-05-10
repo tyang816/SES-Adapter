@@ -17,6 +17,7 @@ from torchmetrics.regression import SpearmanCorrCoef
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
+from datasets import load_dataset
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
@@ -279,11 +280,14 @@ if __name__ == "__main__":
     if args.pdb_type is None:
         args.pdb_type = dataset_config['pdb_type']
     if args.train_file is None:
-        args.train_file = dataset_config['train_file']
+        if dataset_config.get('train_file'):
+            args.train_file = dataset_config['train_file']
     if args.valid_file is None:
-        args.valid_file = dataset_config['valid_file']
+        if dataset_config.get('valid_file'):
+            args.valid_file = dataset_config['valid_file']
     if args.test_file is None:
-        args.test_file = dataset_config['test_file']
+        if dataset_config.get('test_file'):
+            args.test_file = dataset_config['test_file']
     if args.num_labels is None:
         args.num_labels = dataset_config['num_labels']
     if args.problem_type is None:
@@ -360,29 +364,52 @@ if __name__ == "__main__":
             return "Number of parameter: %.2fM" % (num_M)
     print(param_num(model))
     
-    # process dataset
-    def load_dataset(file):
-        dataset, token_num = [], []
+    def process_data_line(data):
+        if args.problem_type == 'multi_label_classification':
+            label_list = data['label'].split(',')
+            data['label'] = [int(l) for l in label_list]
+            binary_list = [0] * args.num_labels
+            for index in data['label']:
+                binary_list[index] = 1
+            data['label'] = binary_list
+        if args.max_seq_len is not None:
+            data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
+            data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
+            data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
+            token_num = min(len(data["aa_seq"]), args.max_seq_len)
+        else:
+            token_num = len(data["aa_seq"])
+        return data, token_num
+    
+    # process dataset from json file
+    def process_dataset_from_json(file):
+        dataset, token_nums = [], []
         for l in open(file):
             data = json.loads(l)
-            if args.problem_type == 'multi_label_classification':
-                binary_list = [0] * args.num_labels
-                for index in data['label']:
-                    binary_list[index] = 1
-                data['label'] = binary_list
-            if args.max_seq_len is not None:
-                data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
-                data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
-                data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
-                token_num.append(min(len(data["aa_seq"]), args.max_seq_len))
-            else:
-                token_num.append(len(data["aa_seq"]))
+            data, token_num = process_data_line(data)
             dataset.append(data)
-        return dataset, token_num
+            token_nums.append(token_num)
+        return dataset, token_nums
 
-    train_dataset, train_token_num = load_dataset(args.train_file)
-    val_dataset, val_token_num = load_dataset(args.valid_file)
-    test_dataset, test_token_num = load_dataset(args.test_file)
+    if args.train_file is not None and args.train_file[:-4] == 'json':
+        train_dataset, train_token_num = process_dataset_from_json(args.train_file)
+        val_dataset, val_token_num = process_dataset_from_json(args.valid_file)
+        test_dataset, test_token_num = process_dataset_from_json(args.test_file)
+    
+    # process dataset from list
+    def process_dataset_from_list(data_list):
+        dataset, token_nums = [], []
+        for l in data_list:
+            data, token_num = process_data_line(l)
+            dataset.append(data)
+            token_nums.append(token_num)
+        return dataset, token_nums
+    
+    if args.train_file == None:
+        train_dataset, train_token_num = process_dataset_from_list(load_dataset(args.dataset)['train'])
+        val_dataset, val_token_num = process_dataset_from_list(load_dataset(args.dataset)['validation'])
+        test_dataset, test_token_num = process_dataset_from_list(load_dataset(args.dataset)['test'])
+    
     if dataset_config['normalize'] == 'min_max':
         train_dataset, val_dataset, test_dataset = min_max_normalize_dataset(train_dataset, val_dataset, test_dataset)
     
