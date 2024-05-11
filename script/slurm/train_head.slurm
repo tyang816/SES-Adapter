@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH -J locseek
+#SBATCH -J SES-Adapter
 #SBATCH -p NvidiaA800
 #SBATCH --nodelist=ZSGPU18
 #SBATCH --ntasks-per-node=1
@@ -8,8 +8,8 @@
 #SBATCH --mem=100G
 #SBATCH -N 1
 #SBATCH --time=180-00:00:00
-#SBATCH --output=/public/home/tanyang/workspace/LocSeek/log/%j.out
-#SBATCH --error=/public/home/tanyang/workspace/LocSeek/log/%j.err
+#SBATCH --output=/public/home/tanyang/workspace/SES-Adapter/log/%j.out
+#SBATCH --error=/public/home/tanyang/workspace/SES-Adapter/log/%j.err
 
 
 source ~/.bashrc
@@ -17,7 +17,7 @@ conda activate protssn
 cd /public/home/tanyang/clash-for-linux-backup-main
 bash start.sh
 proxy_on
-cd /public/home/tanyang/workspace/LocSeek
+cd /public/home/tanyang/workspace/SES-Adapter
 export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=INFO
 export OMP_PROC_BIND=false
