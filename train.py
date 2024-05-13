@@ -185,7 +185,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
         
         if args.wandb:
             test_log = {"test/loss": test_loss, "test/epoch": epoch}
-            for metric_name, metric_score in val_metric_dict.items():
+            for metric_name, metric_score in test_metric_dict.items():
                 test_log[f"test/{metric_name}"] = metric_score
             wandb.log(test_log)
         print(f'EPOCH {epoch} TEST loss: {test_loss:.4f} {args.monitor}: {test_metric_score:.4f}')
