@@ -33,11 +33,36 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 
 ## 🧬 Start with SES-Adapter
 
-### Use The Provided Dataset
+### Dataset Formation
 
-We provide datasets and format references in the `dataset` folder.
+We provide datasets and format references in the `dataset` folder. We support both `JSON` and `CSV` data formats.
 
-### Prepare Your Own Datset
+- JSON:
+  - example: https://github.com/tyang816/SES-Adapter/tree/main/dataset/BP
+  - For more JSON dataset, you can found in [dataset](https://github.com/tyang816/SES-Adapter/tree/main/dataset).
+- CSV example:
+  - example: https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2
+  - For more CSV dataset, you can found in [huggingface](https://huggingface.co/tyang816).
+
+**Config** file should be specified ahead.
+
+- JSON config file [example](https://github.com/tyang816/SES-Adapter/blob/main/dataset/BP/BP_AlphaFold2.json). 
+- CSV config file [example](https://github.com/tyang816/SES-Adapter/blob/main/dataset/BP/BP_AlphaFold2_HF.json).
+
+```
+{
+    "dataset": "BP", # Huggingface: tyang816/BP_AlphaFold2
+    "pdb_type": "AlphaFold2",
+    "train_file": "dataset/BP/AlphaFold2/train.json", # no need for Huggingface
+    "valid_file": "dataset/BP/AlphaFold2/valid.json", # no need for Huggingface
+    "test_file": "dataset/BP/AlphaFold2/test.json", # no need for Huggingface
+    "num_labels": 1943,
+    "problem_type": "multi_label_classification",
+    "metrics": "f1_max",
+    "monitor": "f1_max",
+    "normalize": "None"
+}
+```
 
 ### Train
 
