@@ -12,7 +12,8 @@ from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from transformers import logging
-from torchmetrics.classification import Accuracy
+from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC, F1Score, MatthewsCorrCoef
+from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
 from torchmetrics.regression import SpearmanCorrCoef
 from accelerate import Accelerator
 from accelerate.utils import set_seed
@@ -144,7 +145,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
             val_loss_list.append(val_loss)
             
             if args.wandb:
-                val_log = {"valid/loss": val_loss, "valid/epoch": epoch}
+                val_log = {"valid/loss": val_loss}
                 for metric_name, metric_score in val_metric_dict.items():
                     val_log[f"valid/{metric_name}"] = metric_score
                 wandb.log(val_log)
@@ -167,7 +168,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
             if val_metric_score > best_val_metric_score:
                 best_val_metric_score = val_metric_score
                 torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f}')
+                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f} {args.monitor}: {best_val_metric_score:.4f}')
                 for metric_name, metric_score in val_metric_dict.items():
                     print(f'>>> {metric_name}: {metric_score:.4f}')
                 print(f'>>> Save model to {path}')
@@ -180,23 +181,24 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, test_loader, loss_fn, device)
+        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_fn, device)
         test_metric_score = test_metric_dict[args.monitor]
         
         if args.wandb:
-            test_log = {"test/loss": test_loss, "test/epoch": epoch}
+            test_log = {"test/loss": test_loss}
             for metric_name, metric_score in test_metric_dict.items():
                 test_log[f"test/{metric_name}"] = metric_score
             wandb.log(test_log)
         print(f'EPOCH {epoch} TEST loss: {test_loss:.4f} {args.monitor}: {test_metric_score:.4f}')
+        for metric_name, metric_score in test_metric_dict.items():
+            print(f'>>> {metric_name}: {metric_score:.4f}')
 
 
 def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
-    metrics_result_dict = {}
+    
     for batch in epoch_iterator:
-        step_log = {}
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
@@ -204,17 +206,17 @@ def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=
         for metric_name, metric in metrics_dict.items():
             if args.problem_type == 'regression' and args.num_labels == 1:
                 loss = loss_fn(logits.squeeze(), label.squeeze())
-                metric_socre = metric(logits.squeeze(), label.squeeze()).item()
+                metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
                 loss = loss_fn(logits, label.float())
-                metric_socre = metric(logits, label).item()
+                metric(logits, label)
             else:
                 loss = loss_fn(logits, label)
-                metric_socre = metric(logits, label).item()
-            step_log[metric_name] = metric_socre
+                metric(torch.argmax(logits, 1), label)
         total_loss += loss.item() * len(label)
-        epoch_iterator.set_postfix(eval_loss=loss.item(), **step_log)
+        epoch_iterator.set_postfix(eval_loss=loss.item())
     
+    metrics_result_dict = {}
     epoch_loss = total_loss / len(dataloader.dataset)
     for metric_name, metric in metrics_dict.items():
         metrics_result_dict[metric_name] = metric.compute().item()
@@ -242,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_file', type=str, default=None, help='train file')
     parser.add_argument('--valid_file', type=str, default=None, help='val file')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
-    parser.add_argument('--metrics', nargs='+', default=None, help='computation metrics')
+    parser.add_argument('--metrics', type=str, default=None, help='computation metrics')
     
     # train model
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
@@ -294,14 +296,43 @@ if __name__ == "__main__":
         args.problem_type = dataset_config['problem_type']
     if args.monitor is None:
         args.monitor = dataset_config['monitor']
+    
     metrics_dict = {}
     if args.metrics is None:
         args.metrics = dataset_config['metrics']
-        if args.metrics != 'None' and type(args.metrics) != list:
-            args.metrics = [args.metrics]
+        if args.metrics != 'None':
+            args.metrics = args.metrics.split(',')
             for m in args.metrics:
                 if m == 'accuracy':
-                    metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_labels)
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryAccuracy()
+                    else:
+                        metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_labels)
+                elif m == 'recall':
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryRecall()
+                    else:
+                        metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_labels)
+                elif m == 'precision':
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryPrecision()
+                    else:
+                        metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_labels)
+                elif m == 'f1':
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryF1Score()
+                    else:
+                        metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_labels)
+                elif m == 'mcc':
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryMatthewsCorrCoef()
+                    else:
+                        metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
+                elif m == 'auc':
+                    if args.num_labels == 2:
+                        metrics_dict[m] = BinaryAUROC()
+                    else:
+                        metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_labels)
                 elif m == 'f1_max':
                     metrics_dict[m] = MultilabelF1Max(num_labels=args.num_labels)
                 elif m == 'spearman_corr':
@@ -309,7 +340,8 @@ if __name__ == "__main__":
                 else:
                     raise ValueError(f"Invalid metric: {m}")
             for metric_name, metric in metrics_dict.items():
-                metric.to(device)
+                metric.to(device)            
+        
     
     # create checkpoint directory
     if args.ckpt_dir is None:
