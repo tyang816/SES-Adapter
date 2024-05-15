@@ -181,7 +181,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_fn, device)
+        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, test_loader, loss_fn, device)
         test_metric_score = test_metric_dict[args.monitor]
         
         if args.wandb:
