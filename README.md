@@ -58,11 +58,24 @@ We provide datasets and format references in the `dataset` folder. We support bo
     "test_file": "dataset/BP/AlphaFold2/test.json", # no need for Huggingface
     "num_labels": 1943,
     "problem_type": "multi_label_classification",
-    "metrics": "f1_max",
+    "metrics": "f1_max",  # for multiple metrics use ',' to split, example: "accuracy,recall,precision"
     "monitor": "f1_max",
     "normalize": "None"
 }
 ```
+
+### Metrics Support
+
+| Metric Name   | Full Name        | Problem Type                                            |
+| ------------- | ---------------- | ------------------------------------------------------- |
+| accuracy      | Accuracy         | single_label_classification/ multi_label_classification |
+| recall        | Recall           | single_label_classification/ multi_label_classification |
+| precision     | Precision        | single_label_classification/ multi_label_classification |
+| f1            | F1Score          | single_label_classification/ multi_label_classification |
+| mcc           | MatthewsCorrCoef | single_label_classification/ multi_label_classification |
+| auc           | AUROC            | single_label_classification/ multi_label_classification |
+| f1_max        | F1ScoreMax       | multi_label_classification                              |
+| spearman_corr | SpearmanCorrCoef | regression                                              |
 
 ### Train
 
