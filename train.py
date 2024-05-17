@@ -268,6 +268,7 @@ if __name__ == "__main__":
     
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
+    parser.add_argument('--wandb_entity', type=str, default=None, help='wandb entity')
     parser.add_argument('--wandb_project', type=str, default='SES-Adapter')
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
@@ -359,7 +360,8 @@ if __name__ == "__main__":
             args.model_name = f"{args.wandb_run_name}.pt"
         
         wandb.init(
-            project=args.wandb_project, name=args.wandb_run_name, config=vars(args)
+            project=args.wandb_project, name=args.wandb_run_name, 
+            entity=args.entity, config=vars(args)
         )
     
     # build tokenizer and protein language model

@@ -25,6 +25,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --ckpt_dir adapter_debug/$plm_model/$dataset \
     --model_name "$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter_debug \
     --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
@@ -50,6 +51,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --ckpt_dir adapter_debug/$plm_model/$dataset \
     --model_name woss_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter_debug \
     --wandb_run_name woss_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
@@ -75,6 +77,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --ckpt_dir adapter_debug/$plm_model/$dataset \
     --model_name wofs_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter_debug \
     --wandb_run_name wofs_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
@@ -99,5 +102,6 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --ckpt_dir adapter_debug/$plm_model/$dataset \
     --model_name wofsss_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter_debug \
     --wandb_run_name wofsss_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"

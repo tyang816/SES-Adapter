@@ -33,5 +33,6 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --ckpt_dir $dataset \
     --model_name "$dataset"_"$pdb_type"_"$pooling_method"_"$lr".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter_debug \
     --wandb_run_name "$dataset"_"$pdb_type"_"$pooling_method"_"$lr"

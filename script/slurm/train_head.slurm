@@ -40,5 +40,6 @@ python train.py \
     --ckpt_dir val_acc/$dataset \
     --model_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout".pt \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project adapter \
     --wandb_run_name "$dataset"_"$pdb_type"_5e-4_"$num_heads"_"$pooling_dropout"
