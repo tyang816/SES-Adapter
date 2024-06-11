@@ -361,7 +361,7 @@ if __name__ == "__main__":
         
         wandb.init(
             project=args.wandb_project, name=args.wandb_run_name, 
-            entity=args.entity, config=vars(args)
+            entity=args.wandb_entity, config=vars(args)
         )
     
     # build tokenizer and protein language model
