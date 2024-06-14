@@ -1,18 +1,18 @@
-# dataset: deeploc-1_binary deeploc-1_multi deepsol
-dataset_type=deeploc-1_multi
+dataset=DeepLocMulti
 num_labels=10
-pdb_type=ef
+pdb_type=ESMFold
 pooling_head=mean
-plm_model=esm1b_t33_650M_UR50S
-CUDA_VISIBLE_DEVICES=1 python eval.py \
+plm_model=esm2_t33_650M_UR50D
+CUDA_VISIBLE_DEVICES=0 python eval.py \
     --plm_model ckpt/$plm_model \
+    --dataset $dataset \
+    --problem_type single_label_classification \
     --num_labels $num_labels \
-    --num_attention_heads 8 \
     --pooling_method $pooling_head \
-    --test_file dataset/$dataset_type/$pdb_type"_test.json" \
-    --max_batch_token 100000 \
-    --max_seq_len 1022 \
-    --use_foldseek \
-    --use_ss8 \
-    --ckpt_dir val_acc/$plm_model/$dataset_type \
-    --model_name "$dataset_type"_"$pdb_type"_"$pooling_head"_5e-4.pt
+    --test_file data/$dataset/inden_test.csv \
+    --test_result_dir result/$plm_model/$dataset/inden_test \
+    --metrics accuracy,mcc,auc,precision,recall,f1 \
+    --max_batch_token 10000 \
+    --ckpt_root result \
+    --ckpt_dir $plm_model/$dataset \
+    --model_name "$pdb_type"_"$pooling_head"_5e-4.pt
