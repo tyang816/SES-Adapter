@@ -1,0 +1,42 @@
+#PBS -q ai
+#PBS -l walltime=168:00:00
+#PBS -l select=1:ncpus=12:ngpus=1:mem=100gb
+#PBS -N MIB_noise_001
+#PBS -o /home/tanyang/workspace/SES-Adapter/log
+#PBS -e /home/tanyang/workspace/SES-Adapter/log
+
+zsh
+source ~/.bashrc
+source ~/.zshrc
+source /home/tanyang/miniconda3/bin/activate /home/tanyang/miniconda3/envs/protssn
+cd /home/tanyang/clash-for-linux-backup-main
+bash start.sh
+cd /home/tanyang/workspace/SES-Adapter
+proxy_on
+
+pdb_type=AlphaFold2
+ablation=MIB_noise_002
+plm_model=esm2_t30_150M_UR50D
+# plm_model=esm2_t33_650M_UR50D
+wandb_run_name=fsss_"$plm_model"_"$pdb_type"_mean_5e-4_"$ablation"
+CUDA_VISIBLE_DEVICES=2 python train.py \
+    --plm_model ckpt/$plm_model \
+    --num_attention_heads 8 \
+    --pooling_method mean \
+    --pooling_dropout 0.1 \
+    --dataset_config data/CSV/MetalIonBinding/$ablation.json \
+    --lr 5e-4 \
+    --num_workers 4 \
+    --gradient_accumulation_steps 1 \
+    --max_train_epochs 50 \
+    --max_batch_token 12000 \
+    --patience 5 \
+    --use_foldseek \
+    --use_ss8 \
+    --ckpt_root result \
+    --ckpt_dir $plm_model/MIB_structure_token_ablation \
+    --model_name $wandb_run_name.pt \
+    --wandb \
+    --wandb_entity ty_ang \
+    --wandb_project adapter \
+    --wandb_run_name $wandb_run_name
