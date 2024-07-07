@@ -25,6 +25,7 @@ from src.utils.data_utils import BatchSampler
 from src.models.adapter import AdapterModel
 from src.utils.metrics import MultilabelF1Max
 from src.utils.loss_fn import MultiClassFocalLossWithAlpha
+from src.data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
 
 # ignore warning information
 logging.set_verbosity_error()
@@ -257,8 +258,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
-    parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
-    parser.add_argument('--use_ss8', action='store_true', help='use ss8')
+    parser.add_argument('--structure_seqs', type=str, default=None, help='structure token')
     parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
@@ -276,7 +276,9 @@ if __name__ == "__main__":
     
     set_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+    if args.structure_seqs is not None:
+        args.structure_seqs = args.structure_seqs.split(',')
+        
     dataset_config = json.loads(open(args.dataset_config).read())
     if args.dataset is None:
         args.dataset = dataset_config['dataset']
@@ -382,7 +384,10 @@ if __name__ == "__main__":
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    args.vocab_size = plm_model.config.vocab_size
+    if 'esm3_structure_seq' in args.structure_seqs:
+        args.vocab_size = max(plm_model.config.vocab_size, 4100)
+    else:
+        args.vocab_size = plm_model.config.vocab_size
     
     
     # load adapter model
@@ -406,12 +411,18 @@ if __name__ == "__main__":
             for index in data['label']:
                 binary_list[index] = 1
             data['label'] = binary_list
+        
+        if 'esm3_structure_seq' in args.structure_seqs:
+            data["esm3_structure_seq"] = eval(data["esm3_structure_seq"])
+        
         if args.max_seq_len is not None:
             data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
-            if args.use_foldseek:
+            if 'foldseek_seq' in args.structure_seqs:
                 data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
-            if args.use_ss8:
+            if 'ss8_seq' in args.structure_seqs:
                 data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
+            if 'esm3_structure_seq' in args.structure_seqs:
+                data["esm3_structure_seq"] = data["esm3_structure_seq"][:args.max_seq_len]
             token_num = min(len(data["aa_seq"]), args.max_seq_len)
         else:
             token_num = len(data["aa_seq"])
@@ -459,49 +470,56 @@ if __name__ == "__main__":
     
     def collate_fn(examples):
         aa_seqs, labels = [], []
-        if args.use_foldseek:
+        if 'foldseek_seq' in args.structure_seqs:
             foldseek_seqs = []
-        if args.use_ss8:
+        if 'ss8_seq' in args.structure_seqs:
             ss8_seqs = []
+        if 'esm3_structure_seq' in args.structure_seqs:
+            esm3_structure_seqs = []
+            
         for e in examples:
             aa_seq = e["aa_seq"]
-            if args.use_foldseek:
+            if 'foldseek_seq' in args.structure_seqs:
                 foldseek_seq = e["foldseek_seq"]
-            if args.use_ss8:
+            if 'ss8_seq' in args.structure_seqs:
                 ss8_seq = e["ss8_seq"]
             
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
-                if args.use_foldseek:
+                if 'foldseek_seq' in args.structure_seqs:
                     foldseek_seq = " ".join(list(foldseek_seq))
-                if args.use_ss8:
+                if 'ss8_seq' in args.structure_seqs:
                     ss8_seq = " ".join(list(ss8_seq))
             elif 'ankh' in args.plm_model:
                 aa_seq = list(aa_seq)
-                if args.use_foldseek:
+                if 'foldseek_seq' in args.structure_seqs:
                     foldseek_seq = list(foldseek_seq)
-                if args.use_ss8:
+                if 'ss8_seq' in args.structure_seqs:
                     ss8_seq = list(ss8_seq)
             
             aa_seqs.append(aa_seq)
-            if args.use_foldseek:
+            if 'foldseek_seq' in args.structure_seqs:
                 foldseek_seqs.append(foldseek_seq)
-            if args.use_ss8:
+            if 'ss8_seq' in args.structure_seqs:
                 ss8_seqs.append(ss8_seq)
+            if 'esm3_structure_seq' in args.structure_seqs:
+                esm3_structure_seq = [VQVAE_SPECIAL_TOKENS["BOS"]] + e["esm3_structure_seq"] + [VQVAE_SPECIAL_TOKENS["EOS"]]
+                esm3_structure_seqs.append(torch.tensor(esm3_structure_seq))
+            
             labels.append(e["label"])
         
         if 'ankh' in args.plm_model:
             aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
-            if args.use_foldseek:
+            if 'foldseek_seq' in args.structure_seqs:
                 foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
-            if args.use_ss8:
+            if 'ss8_seq' in args.structure_seqs:
                 ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
         else:
             aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
-            if args.use_foldseek:
+            if 'foldseek_seq' in args.structure_seqs:
                 foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-            if args.use_ss8:
+            if 'ss8_seq' in args.structure_seqs:
                 ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         aa_input_ids = aa_inputs["input_ids"]
@@ -513,10 +531,16 @@ if __name__ == "__main__":
             labels = torch.as_tensor(labels, dtype=torch.long)
         
         data_dict = {"aa_input_ids": aa_input_ids, "attention_mask": attention_mask, "label": labels}
-        if args.use_foldseek:
+        if 'foldseek_seq' in args.structure_seqs:
             data_dict["foldseek_input_ids"] = foldseek_input_ids
-        if args.use_ss8:
+        if 'ss8_seq' in args.structure_seqs:
             data_dict["ss8_input_ids"] = ss8_input_ids
+        if 'esm3_structure_seq' in args.structure_seqs:
+            # pad the list of esm3_structure_seq and convert to tensor
+            esm3_structure_input_ids = torch.nn.utils.rnn.pad_sequence(
+                esm3_structure_seqs, batch_first=True, padding_value=VQVAE_SPECIAL_TOKENS["PAD"]
+                )
+            data_dict["esm3_structure_input_ids"] = esm3_structure_input_ids
         return data_dict
         
     # metrics, optimizer, dataloader

@@ -7,13 +7,22 @@ import numpy as np
 from tqdm import tqdm
 from biotite.structure.io.pdb import PDBFile
 from torch.nn import functional as F
-from esm.utils.structure.protein_chain import ProteinChain
-from esm.utils.constants.esm3 import VQVAE_SPECIAL_TOKENS
-from esm.tokenization.structure_tokenizer import StructureTokenizer
-from esm.models.vqvae import (
+from src.esm.utils.structure.protein_chain import ProteinChain
+from src.esm.utils.constants.esm3 import VQVAE_SPECIAL_TOKENS
+from src.esm.tokenization.structure_tokenizer import StructureTokenizer
+from src.esm.models.vqvae import (
     StructureTokenDecoder,
     StructureTokenEncoder,
 )
+
+VQVAE_CODEBOOK_SIZE = 4096
+VQVAE_SPECIAL_TOKENS = {
+    "MASK": VQVAE_CODEBOOK_SIZE,
+    "EOS": VQVAE_CODEBOOK_SIZE + 1,
+    "BOS": VQVAE_CODEBOOK_SIZE + 2,
+    "PAD": VQVAE_CODEBOOK_SIZE + 3,
+    "CHAINBREAK": VQVAE_CODEBOOK_SIZE + 4,
+}
 
 def ESM3_structure_encoder_v0(device: torch.device | str = "cpu"):
     model = (
@@ -59,7 +68,7 @@ if __name__ == "__main__":
         residue_index = residue_index.to(device)
         _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
 
-        result = {'name':args.pdb_file, 'esm3_structure_tokens':structure_tokens.cpu().numpy().tolist()[0]}
+        result = {'name':args.pdb_file, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
         results.append(result)
         
         with open(args.out_file, "w") as f:
@@ -84,7 +93,7 @@ if __name__ == "__main__":
             residue_index = residue_index.to(device)
             _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
 
-            result = {'name':pdb_file, 'esm3_structure_tokens':structure_tokens.cpu().numpy().tolist()[0]}
+            result = {'name':pdb_file, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
             results.append(result)
             
         with open(args.out_file, "w") as f:

@@ -118,14 +118,15 @@ class AdapterModel(nn.Module):
         super().__init__()
         self.config = config
         
-        if config.use_foldseek:
-            #28
+        if 'foldseek_seq' in config.structure_seqs:
             self.foldseek_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
             self.cross_attention_foldseek = CrossModalAttention(config)
-        if config.use_ss8:
-            #16
+        if 'ss8_seq' in config.structure_seqs:
             self.ss_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
             self.cross_attention_ss = CrossModalAttention(config)
+        if 'esm3_structure_seq' in config.structure_seqs:
+            self.esm3_structure_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
+            self.cross_attention_esm3_structure = CrossModalAttention(config)
         
         self.layer_norm = nn.LayerNorm(config.hidden_size)
         
@@ -154,18 +155,18 @@ class AdapterModel(nn.Module):
         aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
         seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
-        if self.config.use_foldseek:
+        if 'foldseek_seq' in self.config.structure_seqs:
             foldseek_seq = batch['foldseek_input_ids']
             foldseek_embeds = self.foldseek_embedding(foldseek_seq)
             foldseek_embeds = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
             embeds = seq_embeds + foldseek_embeds
             embeds = self.layer_norm(embeds)
         
-        if self.config.use_ss8:
+        if 'ss8_seq' in self.config.structure_seqs:
             ss_seq = batch['ss8_input_ids']
             ss_embeds = self.ss_embedding(ss_seq)
             
-            if self.config.use_foldseek:
+            if 'foldseek_seq' in self.config.structure_seqs:
                 # cross attention with foldseek
                 ss_embeds = self.cross_attention_ss(ss_embeds, embeds, embeds, attention_mask)
                 embeds = ss_embeds + embeds
@@ -175,10 +176,28 @@ class AdapterModel(nn.Module):
                 embeds = ss_embeds + seq_embeds
             embeds = self.layer_norm(embeds)
         
-        if self.config.use_foldseek or self.config.use_ss8:
-            logits = self.classifier(embeds, attention_mask)
-        else:
+        if 'esm3_structure_seq' in self.config.structure_seqs:
+            esm3_structure_seq = batch['esm3_structure_input_ids']
+            esm3_structure_embeds = self.esm3_structure_embedding(esm3_structure_seq)
+            
+            if 'foldseek_seq' in self.config.structure_seqs:
+                # cross attention with foldseek
+                esm3_structure_embeds = self.cross_attention_esm3_structure(esm3_structure_embeds, embeds, embeds, attention_mask)
+                embeds = esm3_structure_embeds + embeds
+            elif 'ss8_seq' in self.config.structure_seqs:
+                # cross attention with ss8
+                esm3_structure_embeds = self.cross_attention_esm3_structure(esm3_structure_embeds, ss_embeds, ss_embeds, attention_mask)
+                embeds = esm3_structure_embeds + ss_embeds
+            else:
+                # cross attention with sequence
+                esm3_structure_embeds = self.cross_attention_esm3_structure(esm3_structure_embeds, seq_embeds, seq_embeds, attention_mask)
+                embeds = esm3_structure_embeds + seq_embeds
+            embeds = self.layer_norm(embeds)
+        
+        if self.config.structure_seqs is not None:
             logits = self.classifier(seq_embeds, attention_mask)
+        else:
+            logits = self.classifier(embeds, attention_mask)            
         
         return logits
        

@@ -15,10 +15,10 @@ cd /home/tanyang/workspace/SES-Adapter
 proxy_on
 
 pdb_type=AlphaFold2
-ablation=MIB_noise_002
+ablation=MIB_ESM3
 plm_model=esm2_t30_150M_UR50D
 # plm_model=esm2_t33_650M_UR50D
-wandb_run_name=fsss_"$plm_model"_"$pdb_type"_mean_5e-4_"$ablation"
+wandb_run_name=esm3_"$plm_model"_"$pdb_type"_mean_5e-4_"$ablation"
 CUDA_VISIBLE_DEVICES=2 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
@@ -31,8 +31,7 @@ CUDA_VISIBLE_DEVICES=2 python train.py \
     --max_train_epochs 50 \
     --max_batch_token 12000 \
     --patience 5 \
-    --use_foldseek \
-    --use_ss8 \
+    --structure_seqs esm3_structure_seq \
     --ckpt_root result \
     --ckpt_dir $plm_model/MIB_structure_token_ablation \
     --model_name $wandb_run_name.pt \
