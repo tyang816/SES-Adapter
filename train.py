@@ -417,12 +417,8 @@ if __name__ == "__main__":
         
         if args.max_seq_len is not None:
             data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
-            if 'foldseek_seq' in args.structure_seqs:
-                data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
-            if 'ss8_seq' in args.structure_seqs:
-                data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
-            if 'esm3_structure_seq' in args.structure_seqs:
-                data["esm3_structure_seq"] = data["esm3_structure_seq"][:args.max_seq_len]
+            for seq in args.structure_seqs:
+                data[seq] = data[seq][:args.max_seq_len]
             token_num = min(len(data["aa_seq"]), args.max_seq_len)
         else:
             token_num = len(data["aa_seq"])

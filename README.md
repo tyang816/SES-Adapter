@@ -10,6 +10,10 @@ We serialized the protein structure and performed cross-modal-attention with PLM
 
 ## 📑 Results
 
+### News
+
+- [2024.07.08] We have added the ESM3 structure tokenizer in `data/get_esm3_structure_seq.py`, you should download the checkpoint from [ESM3 huggingface](https://huggingface.co/EvolutionaryScale/esm3-sm-open-v1/tree/main/data/weights).
+
 ### Paper Results
 
 We conduct evaluation on 9 state-of-the-art baseline models (**ESM2, ProtBert, ProtT5, Ankh**) across 9 datasets under 4 tasks (**Localization, Function, Solubility, Annotation**).

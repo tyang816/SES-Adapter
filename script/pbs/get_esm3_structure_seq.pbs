@@ -1,0 +1,17 @@
+#PBS -q ai
+#PBS -l walltime=168:00:00
+#PBS -l select=1:ncpus=4:ngpus=1:mem=50gb
+#PBS -N Thermostability_alphafold_esm3
+#PBS -o /home/tanyang/workspace/SES-Adapter/log
+#PBS -e /home/tanyang/workspace/SES-Adapter/log
+
+zsh
+source ~/.zshrc
+source /home/tanyang/miniconda3/bin/activate /home/tanyang/miniconda3/envs/protein
+cd /home/tanyang/workspace/SES-Adapter
+
+dataset=Thermostability
+pdb_type=alphafold
+CUDA_VISIBLE_DEVICES=0 python src/data/get_esm3_structure_seq.py \
+    --pdb_dir data/raw/$dataset/"$pdb_type"_pdb \
+    --out_file data/raw/$dataset/"$pdb_type"_esm3.json

@@ -14,12 +14,12 @@ bash start.sh
 cd /home/tanyang/workspace/SES-Adapter
 proxy_on
 
-pdb_type=AlphaFold2
-ablation=MIB_ESM3
-plm_model=esm2_t30_150M_UR50D
+pdb_type=ESMFold
+ablation=MIB_ESM3_EF
 # plm_model=esm2_t33_650M_UR50D
+plm_model=prot_bert_bfd
 wandb_run_name=esm3_"$plm_model"_"$pdb_type"_mean_5e-4_"$ablation"
-CUDA_VISIBLE_DEVICES=2 python train.py \
+CUDA_VISIBLE_DEVICES=0 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method mean \

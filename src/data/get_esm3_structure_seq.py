@@ -1,5 +1,7 @@
 import torch
 import os
+import sys
+sys.path.append(os.getcwd())
 import json
 import argparse
 import pandas as pd
@@ -68,7 +70,7 @@ if __name__ == "__main__":
         residue_index = residue_index.to(device)
         _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
 
-        result = {'name':args.pdb_file, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
+        result = {'name':args.pdb_file, 'aa_seq':sequence, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
         results.append(result)
         
         with open(args.out_file, "w") as f:
@@ -93,7 +95,7 @@ if __name__ == "__main__":
             residue_index = residue_index.to(device)
             _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
 
-            result = {'name':pdb_file, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
+            result = {'name':pdb_file, 'aa_seq':sequence, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
             results.append(result)
             
         with open(args.out_file, "w") as f:
