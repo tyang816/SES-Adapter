@@ -1,25 +1,23 @@
 #PBS -q ai
 #PBS -l walltime=168:00:00
-#PBS -l select=1:ncpus=12:ngpus=1:mem=100gb
-#PBS -N MIB_noise_001
+#PBS -l select=1:ncpus=6:ngpus=1:mem=100gb
+#PBS -N esm2_650M_05
 #PBS -o /home/tanyang/workspace/SES-Adapter/log
 #PBS -e /home/tanyang/workspace/SES-Adapter/log
 
-zsh
-source ~/.bashrc
-source ~/.zshrc
-source /home/tanyang/miniconda3/bin/activate /home/tanyang/miniconda3/envs/protssn
 cd /home/tanyang/clash-for-linux-backup-main
 bash start.sh
+zsh
+source ~/.zshrc
 cd /home/tanyang/workspace/SES-Adapter
+conda activate protssn
 proxy_on
 
-pdb_type=ESMFold
-ablation=MIB_ESM3_EF
-# plm_model=esm2_t33_650M_UR50D
-plm_model=prot_bert_bfd
-wandb_run_name=esm3_"$plm_model"_"$pdb_type"_mean_5e-4_"$ablation"
-CUDA_VISIBLE_DEVICES=0 python train.py \
+pdb_type=AlphaFold2
+ablation=MIB_noise_005
+plm_model=prot_bert
+wandb_run_name=fsss_"$plm_model"_"$pdb_type"_"$ablation"
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method mean \
@@ -31,7 +29,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --max_train_epochs 50 \
     --max_batch_token 12000 \
     --patience 5 \
-    --structure_seqs esm3_structure_seq \
+    --structure_seqs foldseek_seq,ss8_seq \
     --ckpt_root result \
     --ckpt_dir $plm_model/MIB_structure_token_ablation \
     --model_name $wandb_run_name.pt \

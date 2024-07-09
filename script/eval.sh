@@ -28,8 +28,7 @@ CUDA_VISIBLE_DEVICES=3 python eval.py \
     --problem_type single_label_classification \
     --num_labels $num_labels \
     --pooling_method mean \
-    --use_foldseek \
-    --use_ss8 \
+    --structure_seqs foldseek_seq,ss8_seq \
     --test_file data/CSV/MetalIonBinding/AlphaFold2/test.csv \
     --test_result_dir result/structural_quality_ablation/"$plm_model"_"$dataset"_ef_to_af \
     --metrics accuracy \
