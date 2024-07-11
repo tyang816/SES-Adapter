@@ -14,10 +14,10 @@ conda activate protssn
 proxy_on
 
 pdb_type=AlphaFold2
-ablation=MIB_noise_005
-plm_model=prot_bert
-wandb_run_name=fsss_"$plm_model"_"$pdb_type"_"$ablation"
-CUDA_VISIBLE_DEVICES=1 python train.py \
+ablation=MIB_ESM3_EF
+plm_model=prot_bert_bfd
+wandb_run_name="$plm_model"_"$pdb_type"_"$ablation"
+CUDA_VISIBLE_DEVICES=0 python train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method mean \
@@ -29,7 +29,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --max_train_epochs 50 \
     --max_batch_token 12000 \
     --patience 5 \
-    --structure_seqs foldseek_seq,ss8_seq \
+    --structure_seqs esm3_structure_seq \
     --ckpt_root result \
     --ckpt_dir $plm_model/MIB_structure_token_ablation \
     --model_name $wandb_run_name.pt \
