@@ -12,6 +12,7 @@ We serialized the protein structure and performed cross-modal-attention with PLM
 
 ### News
 
+- [2024.07.31] Congratulations! Our paper was accepted by *Journal of Chemical Information and Science*!
 - [2024.07.08] We have added the ESM3 structure tokenizer in `data/get_esm3_structure_seq.py`, you should download the checkpoint from [ESM3 huggingface](https://huggingface.co/EvolutionaryScale/esm3-sm-open-v1/tree/main/data/weights).
 
 ### Paper Results
@@ -91,10 +92,11 @@ Please cite our work if you have used our code or data.
 
 ```
 @article{tan2024ses-adapter,
-  title={Simple, Efficient and Scalable Structure-aware Adapter Boosts Protein Language Models},
+  title={Simple, Efficient, and Scalable Structure-Aware Adapter Boosts Protein Language Models},
   author={Tan, Yang and Li, Mingchen and Zhou, Bingxin and Zhong, Bozitao and Zheng, Lirong and Tan, Pan and Zhou, Ziyi and Yu, Huiqun and Fan, Guisheng and Hong, Liang},
-  journal={arXiv preprint arXiv:2404.14850},
-  year={2024}
+  journal={Journal of Chemical Information and Modeling},
+  year={2024},
+  publisher={ACS Publications}
 }
 ```
 
