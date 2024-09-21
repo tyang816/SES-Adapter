@@ -194,7 +194,7 @@ class AdapterModel(nn.Module):
                 embeds = esm3_structure_embeds + seq_embeds
             embeds = self.layer_norm(embeds)
         
-        if self.config.structure_seqs is not None:
+        if self.config.structure_seqs:
             logits = self.classifier(embeds, attention_mask)
         else:
             logits = self.classifier(seq_embeds, attention_mask)            

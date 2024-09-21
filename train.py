@@ -241,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_config', type=str, default=None, help='config of dataset')
     parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
-    parser.add_argument('--pdb_type', type=str, default='ef', help='pdb type')
+    parser.add_argument('--pdb_type', type=str, default=None, help='pdb type')
     parser.add_argument('--train_file', type=str, default=None, help='train file')
     parser.add_argument('--valid_file', type=str, default=None, help='val file')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
@@ -384,11 +384,13 @@ if __name__ == "__main__":
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    if 'esm3_structure_seq' in args.structure_seqs:
-        args.vocab_size = max(plm_model.config.vocab_size, 4100)
+    if args.structure_seqs is not None:
+        if 'esm3_structure_seq' in args.structure_seqs: 
+            args.vocab_size = max(plm_model.config.vocab_size, 4100)
+        else:
+            args.vocab_size = plm_model.config.vocab_size
     else:
-        args.vocab_size = plm_model.config.vocab_size
-    
+        args.structure_seqs = []
     
     # load adapter model
     model = AdapterModel(args)

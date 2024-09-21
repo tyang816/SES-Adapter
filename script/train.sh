@@ -80,7 +80,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --wandb_project adapter_debug \
     --wandb_run_name wofs_"$dataset"_"$pdb_type"_"$pooling_head"_"$plm_model"_"$lr"
 
-dataset=esm2_t33_650M_UR50D
+dataset=DeepSoluE
 pdb_type=ESMFold
 pooling_head=mean
 plm_model=esm2_t30_150M_UR50D
