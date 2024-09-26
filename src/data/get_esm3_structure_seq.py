@@ -9,10 +9,10 @@ import numpy as np
 from tqdm import tqdm
 from biotite.structure.io.pdb import PDBFile
 from torch.nn import functional as F
-from src.esm.utils.structure.protein_chain import ProteinChain
-from src.esm.utils.constants.esm3 import VQVAE_SPECIAL_TOKENS
-from src.esm.tokenization.structure_tokenizer import StructureTokenizer
-from src.esm.models.vqvae import (
+from esm.utils.structure.protein_chain import ProteinChain
+from esm.utils.constants.esm3 import VQVAE_SPECIAL_TOKENS
+from esm.tokenization.structure_tokenizer import StructureTokenizer
+from esm.models.vqvae import (
     StructureTokenDecoder,
     StructureTokenEncoder,
 )
