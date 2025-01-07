@@ -1,6 +1,6 @@
 # Simple, Efficient and Scalable Structure-aware Adapter Boosts Protein Language Models
 
-## 🚀 Introduction (Pro-SESAdapter/ SES-Adapter)
+## 🚀 Introduction (Venus-SESAdapter/ SES-Adapter)
 
 SES-Adapter, a simple, efficient, and scalable adapter method for enhancing the representation learning of protein language models (PLMs). 
 
