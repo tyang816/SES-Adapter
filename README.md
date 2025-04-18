@@ -46,8 +46,8 @@ We provide datasets and format references in the `dataset` folder. We support bo
   - example: https://github.com/tyang816/SES-Adapter/tree/main/dataset/BP
   - For more JSON dataset, you can found in [dataset](https://github.com/tyang816/SES-Adapter/tree/main/dataset).
 - CSV example:
-  - example: https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2
-  - For more CSV dataset, you can found in [huggingface](https://huggingface.co/tyang816).
+  - example: https://huggingface.co/datasets/ai4protein/DeepLocBinary_AlphaFold2
+  - For more CSV dataset, you can found in [huggingface](https://huggingface.co/ai4protein).
 
 **Config** file should be specified ahead.
 
@@ -56,7 +56,7 @@ We provide datasets and format references in the `dataset` folder. We support bo
 
 ```
 {
-    "dataset": "BP", # Huggingface: tyang816/BP_AlphaFold2
+    "dataset": "BP", # Huggingface: ai4protein/BP_AlphaFold2
     "pdb_type": "AlphaFold2",
     "train_file": "dataset/BP/AlphaFold2/train.json", # no need for Huggingface
     "valid_file": "dataset/BP/AlphaFold2/valid.json", # no need for Huggingface
